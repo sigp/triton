@@ -1,0 +1,11 @@
+---
+# defaults file for sigp.microk8s.reset
+
+# Reset type (full or partial)
+microk8s_reset_type: "full"
+
+# Namespaces to remove (for partial reset)
+microk8s_namespaces_to_remove: []
+
+# Reset confirmation (set to true to skip confirmation prompt)
+microk8s_skip_reset_confirmation: false

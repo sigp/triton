@@ -1,0 +1,24 @@
+---
+# tasks file for sigp.microk8s.reset
+
+- name: Reset MicroK8s cluster
+  command: microk8s reset
+  become: true
+  when: microk8s_reset_type == 'full' or microk8s_reset_type is not defined
+  tags: reset
+
+- name: Remove specific namespaces
+  kubernetes.core.k8s:
+    api_version: v1
+    kind: Namespace
+    name: "{{ item }}"
+    state: absent
+  loop: "{{ microk8s_namespaces_to_remove }}"
+  when: microk8s_reset_type == 'partial' and microk8s_namespaces_to_remove is defined
+  tags: reset
+
+- name: Verify cluster reset
+  command: microk8s status
+  register: reset_status
+  changed_when: false
+  tags: reset

@@ -1,0 +1,24 @@
+---
+# defaults file for sigp.microk8s.configure
+
+# Features to enable
+microk8s_features:
+  - dns
+  - storage:size=40Gi
+  - dashboard
+  - community
+
+# Node management
+microk8s_primary: "{{ groups['microk8s_primary'] | first }}"
+microk8s_workers: "{{ groups['microk8s_workers'] | default([]) }}"
+
+# Storage configuration
+microk8s_storage_size: 40Gi
+microk8s_storage_class: standard
+
+# User configuration (inherited from install role)
+microk8s_user: "{{ ansible_user }}"
+
+# Additional configuration options
+microk8s_enable_argocd: false
+microk8s_enable_linkerd: false

@@ -1,0 +1,52 @@
+---
+# tasks file for sigp.microk8s.deploy
+
+- name: Ensure namespaces exist
+  kubernetes.core.k8s:
+    api_version: v1
+    kind: Namespace
+    name: "{{ item.name }}"
+    state: present
+  loop: "{{ microk8s_namespaces }}"
+  tags: deploy
+
+- name: Deploy services
+  kubernetes.core.k8s:
+    state: present
+    definition:
+      apiVersion: v1
+      kind: Service
+      metadata:
+        namespace: "{{ item.namespace | default('default') }}"
+        name: "{{ item.name }}"
+        labels: "{{ item.labels | default({}) }}"
+      spec:
+        ports: "{{ item.ports }}"
+        selector: "{{ item.selector | default({}) }}"
+  loop: "{{ microk8s_services }}"
+  tags: deploy
+
+- name: Create persistent volume claims
+  kubernetes.core.k8s:
+    state: present
+    definition:
+      apiVersion: v1
+      kind: PersistentVolumeClaim
+      metadata:
+        name: "{{ item.name }}"
+        namespace: "{{ item.namespace | default('default') }}"
+      spec:
+        accessModes: "{{ item.accessModes | default(['ReadWriteOnce']) }}"
+        resources:
+          requests:
+            storage: "{{ item.storage | default('1Gi') }}"
+        storageClassName: "{{ item.storageClassName | default(microk8s_storage_class) }}"
+  loop: "{{ microk8s_pvcs }}"
+  tags: deploy
+
+- name: Apply configuration templates
+  kubernetes.core.k8s:
+    state: present
+    template: "{{ item }}"
+  loop: "{{ microk8s_templates }}"
+  tags: deploy

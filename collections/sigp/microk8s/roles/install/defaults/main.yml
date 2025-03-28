@@ -1,0 +1,22 @@
+---
+# defaults file for sigp.microk8s.install
+
+# User configuration
+microk8s_user: "{{ ansible_user }}"
+
+# Kubectl configuration
+kubectl_install_path: /usr/local/bin/kubectl
+kubectl_version_url: https://dl.k8s.io/release/stable.txt
+
+# Helm configuration
+helm_install_script_url: https://raw.githubusercontent.com/helm/helm/main/scripts/get-helm-3
+helm_install_path: /usr/local/bin/helm
+
+# System packages to install
+system_packages:
+  - python3-pip
+  - python3-kubernetes
+
+# MicroK8s snap configuration
+microk8s_snap_channel: stable
+microk8s_snap_classic: true

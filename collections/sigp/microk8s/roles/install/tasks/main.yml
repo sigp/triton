@@ -1,0 +1,54 @@
+---
+# tasks file for sigp.microk8s.install
+- name: Get the latest stable version of kubectl
+  uri:
+    url: "https://dl.k8s.io/release/stable.txt"
+    return_content: yes
+  register: kubectl_version
+  tags: install
+
+- name: Download kubectl binary
+  get_url:
+    url: "https://dl.k8s.io/release/{{ kubectl_version.content | trim }}/bin/linux/amd64/kubectl"
+    dest: /usr/local/bin/kubectl
+    mode: '0755'
+    owner: root
+    group: root
+  tags: install
+
+- name: Install Helm
+  block:
+    - name: Download Helm installation script
+      ansible.builtin.get_url:
+        url: https://raw.githubusercontent.com/helm/helm/main/scripts/get-helm-3
+        dest: /tmp/get_helm.sh
+        mode: '0755'
+    
+    - name: Run Helm installation script
+      command: /tmp/get_helm.sh
+      args:
+        creates: /usr/local/bin/helm
+  tags: install
+
+- name: Install required system packages
+  apt:
+    name: "{{ item }}"
+    state: present
+  loop:
+    - python3-pip
+    - python3-kubernetes
+  tags: install
+
+- name: Install MicroK8s snap
+  snap:
+    name: microk8s
+    state: present
+    classic: yes
+  tags: install
+
+- name: Add user to microk8s group
+  user:
+    name: "{{ microk8s_user | default(ansible_user) }}"
+    groups: microk8s
+    append: yes
+  tags: install

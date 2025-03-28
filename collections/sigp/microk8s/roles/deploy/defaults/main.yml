@@ -1,0 +1,23 @@
+---
+# defaults file for sigp.microk8s.deploy
+
+# Namespaces to create
+microk8s_namespaces:
+  - name: default
+  - name: kube-system
+
+# Services to deploy
+microk8s_services: []
+
+# Persistent volume claims
+microk8s_pvcs: []
+
+# Templates to apply
+microk8s_templates: []
+
+# Default storage class (inherited from configure role)
+microk8s_storage_class: "standard"
+
+# Default resource requests
+microk8s_default_cpu_request: "100m"
+microk8s_default_memory_request: "128Mi"

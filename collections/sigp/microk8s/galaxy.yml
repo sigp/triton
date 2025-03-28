@@ -1,0 +1,22 @@
+---
+namespace: sigp
+name: microk8s
+version: 1.0.0
+readme: README.md
+authors:
+  - Sigmaprime Team
+description: Ansible collection for installing and managing MicroK8s clusters
+license:
+  - Apache-2.0
+repository: https://github.com/sigp/microk8s-ansible-collection
+documentation: https://github.com/sigp/microk8s-ansible-collection/docs
+homepage: https://github.com/sigp/microk8s-ansible-collection
+issues: https://github.com/sigp/microk8s-ansible-collection/issues
+tags:
+  - kubernetes
+  - microk8s
+  - container
+  - orchestration
+dependencies:
+  kubernetes.core: ">=2.0.0"
+  community.general: ">=4.0.0"
