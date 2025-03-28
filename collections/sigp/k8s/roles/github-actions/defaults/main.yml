@@ -14,6 +14,7 @@ github_actions_target_namespaces:
   - default
   - lynx
   - rbuilder
+  - helix
 
 # ClusterRoleBinding configuration
 github_actions_cluster_role_binding_name: github-actions-cluster-admin
