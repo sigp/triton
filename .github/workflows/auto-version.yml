@@ -1,8 +1,10 @@
 name: Auto Version
 
 on:
-  pull_request:
-    types: [opened, reopened, labeled]
+  pull_request:  # For direct PR-triggered workflows
+    types: [opened, synchronize, reopened]
+  push:          # If you want to run on pushes to PR branches
+    branches-ignore: [main, master]
   workflow_call:
     outputs:
       next_version:
@@ -29,9 +31,14 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          PR_NUMBER=$(jq --raw-output .pull_request.number "$GITHUB_EVENT_PATH")
+          # For pull_request-triggered workflows
+          PR_NUMBER=${{ github.event.pull_request.number }}
+      
+          # For workflows triggered by other events (e.g., push)
+          # PR_NUMBER=$(gh pr list --head "$GITHUB_REF_NAME" --json number --jq '.[0].number')
+      
           LABELS=$(gh pr view $PR_NUMBER --json labels --jq '.labels[].name')
-          echo "::set-output name=labels::$LABELS"
+          echo "labels=$LABELS" >> $GITHUB_OUTPUT
 
   
 
@@ -40,7 +47,7 @@ jobs:
         id: version-bump
         run: |
           LABELS="${{ steps.get-labels.outputs.labels }}"
-          VERSION_BUMP="minor"  # Default to minor if no labels
+          VERSION_BUMP="patch"  # Default to minor if no labels
           if [[ "$LABELS" == *"breaking"* ]]; then
             VERSION_BUMP="major"
           elif [[ "$LABELS" == *"minor"* ]]; then
@@ -68,6 +75,7 @@ jobs:
           version-fragment: ${{ steps.version-bump.outputs.version_bump }}
 
       - name: Create new version tag
+        if: ${{ steps.version-bump.outputs.version_bump == 'major' || steps.version-bump.outputs.version_bump == 'minor' }}
         run: |
           git tag v${{ steps.bump-version.outputs.next-version }}
           git push origin v${{ steps.bump-version.outputs.next-version }}
