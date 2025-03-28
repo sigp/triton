@@ -18,7 +18,7 @@ jobs:
           LABELS=$(gh pr view $PR_NUMBER --json labels --jq '.labels[].name')
           echo "::set-output name=labels::$LABELS"
         env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GH_TOKEN: ${{ github.token }}
 
       - name: Determine version bump
         id: version-bump
