@@ -18,14 +18,11 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v2
 
-      - name: Install GitHub CLI
+      - name: Debug GitHub Token
         run: |
-          sudo apt-key adv --keyserver keyserver.ubuntu.com --recv-key C99B11DEB97541F0
-          sudo apt-add-repository https://cli.github.com/packages
-          sudo apt update
-          sudo apt install gh
-
-      
+          echo "GitHub Token: $GH_TOKEN"
+        env:
+            GH_TOKEN: ${{ github.token }}
       
       - name: Get pull request labels
         id: get-labels
@@ -36,11 +33,7 @@ jobs:
           env:
             GH_TOKEN: ${{ github.token }}
   
-      - name: Debug GitHub Token
-        run: |
-          echo "GitHub Token: $GH_TOKEN"
-        env:
-            GH_TOKEN: ${{ github.token }}
+
 
       - name: Determine version bump
         id: version-bump
