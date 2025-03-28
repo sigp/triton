@@ -26,12 +26,13 @@ jobs:
       
       - name: Get pull request labels
         id: get-labels
+        env:
+          GH_TOKEN: ${{ github.token }}
         run: |
           PR_NUMBER=$(jq --raw-output .pull_request.number "$GITHUB_EVENT_PATH")
           LABELS=$(gh pr view $PR_NUMBER --json labels --jq '.labels[].name')
           echo "::set-output name=labels::$LABELS"
-          env:
-            GH_TOKEN: ${{ github.token }}
+
   
 
 
