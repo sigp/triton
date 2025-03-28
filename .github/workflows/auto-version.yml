@@ -3,10 +3,17 @@ name: Auto Version
 on:
   pull_request:
     types: [opened, reopened, labeled]
+  workflow_call:
+    outputs:
+      next_version:
+        description: "The next version after bumping"
+        value: ${{ jobs.auto-version.outputs.next_version }}
 
 jobs:
   auto-version:
     runs-on: ubuntu-latest
+    outputs:
+      next_version: ${{ steps.bump-version.outputs.next-version }}
     steps:
       - name: Checkout code
         uses: actions/checkout@v2
