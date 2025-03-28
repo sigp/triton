@@ -4,12 +4,18 @@ This repository contains reusable infrastructure automation components including
 
 ## Ansible Collections
 
-The repository hosts the `sigp.microk8s` Ansible collection which provides roles for managing MicroK8s clusters:
+The repository hosts the following Ansible collections:
 
+### sigp.microk8s
+Provides roles for managing MicroK8s clusters:
 - `install`: Installs MicroK8s with configurable options
 - `configure`: Configures MicroK8s with addons and settings
 - `deploy`: Deploys applications to the MicroK8s cluster
 - `reset`: Resets the MicroK8s cluster to a clean state
+
+### sigp.k8s
+Provides general Kubernetes administration roles:
+- `github-actions`: Configures Kubernetes permissions for GitHub Actions workflows
 
 ## GitHub Workflows
 
@@ -19,7 +25,7 @@ Reusable GitHub workflows for Kubernetes operations:
 
 ## Usage
 
-To use the Ansible collection:
+To use the Ansible collections:
 ```bash
 ansible-galaxy collection install git+https://github.com/sigp/triton.git
 ```
