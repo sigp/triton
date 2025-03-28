@@ -1,4 +1,4 @@
-# SIGP Triton Repository
+# Triton
 
 This repository contains reusable infrastructure automation components including Ansible collections and GitHub workflows.
 
