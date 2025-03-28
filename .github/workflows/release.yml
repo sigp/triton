@@ -9,25 +9,46 @@ on:
       - '.github/workflows/release.yml'
 
 jobs:
-  build-and-release:
+  setup:
     runs-on: ubuntu-latest
-    permissions:
-      contents: write
+    outputs:
+      collections: ${{ steps.find-collections.outputs.collections }}
     steps:
       - uses: actions/checkout@v4
         with:
           fetch-depth: 0
 
-      - name: Build microk8s collection
-        id: build-microk8s
+      - name: Find collections
+        id: find-collections
+        run: |
+          COLLECTIONS=$(find collections -type f -name galaxy.yml | sed 's/\/galaxy.yml//' | jq -R -s -c 'split("\n")[:-1]')
+          echo "collections=$COLLECTIONS" >> $GITHUB_OUTPUT
+
+  build-and-release:
+    needs: setup
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    strategy:
+      matrix:
+        collection: ${{ fromJson(needs.setup.outputs.collections) }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Build collection
+        id: build-collection
         uses: ansible-community/github-action-build-collection@main
         with:
-          subdirectory: collections/sigp/microk8s
+          subdirectory: ${{ matrix.collection }}
 
       - name: Get current version
         id: version
         run: |
-          echo "current_version=${{ steps.build-microk8s.outputs.collection-version }}" >> $GITHUB_OUTPUT
+          version=$(grep "version:" "${{ matrix.collection }}/galaxy.yml" | awk '{print $2}')
+          echo "current_version=$version" >> $GITHUB_OUTPUT
+          echo "collection_name=$(basename ${{ matrix.collection }})" >> $GITHUB_OUTPUT
 
       - name: Determine version bump
         id: bump
@@ -65,22 +86,30 @@ jobs:
           esac
 
           echo "new_version=$MAJOR.$MINOR.$PATCH" >> $GITHUB_OUTPUT
+          echo "$(basename ${{ matrix.collection }}): $MAJOR.$MINOR.$PATCH" >> versions.txt
 
       - name: Update version in galaxy.yml
         run: |
-          cd collections/sigp/microk8s
+          cd ${{ matrix.collection }}
           sed -i "s/version: .*/version: ${{ steps.new_version.outputs.new_version }}/" galaxy.yml
           git config --global user.name "GitHub Actions"
           git config --global user.email "actions@github.com"
           git add galaxy.yml
           git commit -m "chore: bump version to ${{ steps.new_version.outputs.new_version }}"
-          git push
+          cd ../..
+
+      - name: Push version updates
+        if: matrix.collection == 'collections/sigp/microk8s'
+        run: git push
 
       - name: Create Release
+        if: matrix.collection == 'collections/sigp/microk8s'
         uses: softprops/action-gh-release@v1
         with:
-          files: ${{ steps.build-microk8s.outputs.artifact-path }}
-          tag_name: v${{ steps.new_version.outputs.new_version }}
-          name: v${{ steps.new_version.outputs.new_version }}
+          files: ${{ needs.build-and-release.outputs.artifact-path }}
+          tag_name: collections-v${{ steps.new_version.outputs.new_version }}
+          name: Collections Release ${{ steps.new_version.outputs.new_version }}
           body: |
-            Release ${{ steps.new_version.outputs.new_version }} of Ansible Collections
+            Release of Ansible Collections
+            Versions:
+            ${{ steps.new_version.outputs.new_version }}
