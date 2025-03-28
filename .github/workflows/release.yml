@@ -24,11 +24,9 @@ jobs:
           COLLECTIONS=$(find collections -type f -name galaxy.yml | sed 's/\/galaxy.yml//' | jq -R -s -c 'split("\n")[:-1]')
           echo "collections=$COLLECTIONS" >> $GITHUB_OUTPUT
 
-  build-and-release:
+  build:
     needs: setup
     runs-on: ubuntu-latest
-    permissions:
-      contents: write
     strategy:
       matrix:
         collection: ${{ fromJson(needs.setup.outputs.collections) }}
@@ -42,6 +40,12 @@ jobs:
         uses: ansible-community/github-action-build-collection@main
         with:
           subdirectory: ${{ matrix.collection }}
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ matrix.collection }}-artifact
+          path: ${{ steps.build-collection.outputs.artifact-path }}
 
       - name: Get current version
         id: version
@@ -86,8 +90,6 @@ jobs:
           esac
 
           echo "new_version=$MAJOR.$MINOR.$PATCH" >> $GITHUB_OUTPUT
-          echo "artifact_name=sigp-$(basename ${{ matrix.collection }})-$MAJOR.$MINOR.$PATCH.tar.gz" >> $GITHUB_OUTPUT
-          mv ${{ steps.build-collection.outputs.artifact-path }} ${{ github.workspace }}/${{ steps.new_version.outputs.artifact_name }}
 
       - name: Update version in galaxy.yml
         run: |
@@ -100,19 +102,26 @@ jobs:
           cd ../..
 
       - name: Push version updates
-        if: matrix.collection == 'collections/sigp/microk8s'
         run: git push
 
+  release:
+    needs: [setup, build]
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - name: Download artifacts
+        uses: actions/download-artifact@v4
+        with:
+          path: artifacts
+
       - name: Create Release
-        if: matrix.collection == 'collections/sigp/microk8s'
         uses: softprops/action-gh-release@v1
         with:
-          files: |
-            sigp-microk8s-${{ steps.new_version.outputs.new_version }}.tar.gz
-            sigp-k8s-${{ steps.new_version.outputs.new_version }}.tar.gz
-          tag_name: collections-v${{ steps.new_version.outputs.new_version }}
-          name: Collections Release ${{ steps.new_version.outputs.new_version }}
+          files: artifacts/*
+          tag_name: collections-release
+          name: Ansible Collections Release
           body: |
             Release of Ansible Collections
-            - sigp.microk8s: ${{ steps.new_version.outputs.new_version }}
-            - sigp.k8s: ${{ steps.new_version.outputs.new_version }}
+            - sigp.microk8s: ${{ needs.build.outputs['collections/sigp/microk8s-new_version'] }}
+            - sigp.k8s: ${{ needs.build.outputs['collections/sigp/k8s-new_version'] }}
