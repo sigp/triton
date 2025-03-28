@@ -75,6 +75,7 @@ jobs:
           version-fragment: ${{ steps.version-bump.outputs.version_bump }}
 
       - name: Create new version tag
+        if: ${{ steps.version-bump.outputs.version_bump == 'major' || steps.version-bump.outputs.version_bump == 'minor' }}
         run: |
           git tag v${{ steps.bump-version.outputs.next-version }}
           git push origin v${{ steps.bump-version.outputs.next-version }}
