@@ -1,0 +1,67 @@
+---
+- name: Create {{ github_actions_namespace }} namespace
+  k8s:
+    api_version: v1
+    kind: Namespace
+    name: "{{ github_actions_namespace }}"
+    state: present
+
+- name: Create service account
+  k8s:
+    api_version: v1
+    kind: ServiceAccount
+    name: "{{ github_actions_service_account }}"
+    namespace: "{{ github_actions_namespace }}"
+    state: present
+
+- name: Create {{ github_actions_role_name }} Role in target namespaces
+  k8s:
+    state: present
+    definition:
+      apiVersion: rbac.authorization.k8s.io/v1
+      kind: Role
+      metadata:
+        name: "{{ github_actions_role_name }}"
+        namespace: "{{ item }}"
+      rules:
+      - apiGroups: [""]
+        resources: ["pods"]
+        verbs: ["get", "list", "watch"]
+  loop: "{{ github_actions_target_namespaces }}"
+
+- name: Create {{ github_actions_role_binding_name }} RoleBinding in target namespaces
+  k8s:
+    state: present
+    definition:
+      apiVersion: rbac.authorization.k8s.io/v1
+      kind: RoleBinding
+      metadata:
+        name: "{{ github_actions_role_binding_name }}"
+        namespace: "{{ item }}"
+      subjects:
+      - kind: ServiceAccount
+        name: "{{ github_actions_service_account }}"
+        namespace: "{{ github_actions_namespace }}"
+      roleRef:
+        kind: Role
+        name: "{{ github_actions_role_name }}"
+        apiGroup: rbac.authorization.k8s.io
+  loop: "{{ github_actions_target_namespaces }}"
+
+- name: Create {{ github_actions_cluster_role_binding_name }} ClusterRoleBinding (if needed)
+  k8s:
+    state: present
+    definition:
+      apiVersion: rbac.authorization.k8s.io/v1
+      kind: ClusterRoleBinding
+      metadata:
+        name: "{{ github_actions_cluster_role_binding_name }}"
+      subjects:
+      - kind: ServiceAccount
+        name: "{{ github_actions_service_account }}"
+        namespace: "{{ github_actions_namespace }}"
+      roleRef:
+        kind: ClusterRole
+        name: "{{ github_actions_cluster_role_name }}"
+        apiGroup: rbac.authorization.k8s.io
+  when: github_actions_enable_cluster_admin | bool
