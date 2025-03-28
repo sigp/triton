@@ -17,6 +17,8 @@ jobs:
           PR_NUMBER=$(jq --raw-output .pull_request.number "$GITHUB_EVENT_PATH")
           LABELS=$(gh pr view $PR_NUMBER --json labels --jq '.labels[].name')
           echo "::set-output name=labels::$LABELS"
+        env:
+          GH_TOKEN: ${{ secrets.PAT_TOKEN || secrets.GITHUB_TOKEN }}
 
       - name: Determine version bump
         id: version-bump
