@@ -1,0 +1,55 @@
+name: Auto Version
+
+on:
+  pull_request:
+    types: [opened, reopened, labeled]
+
+jobs:
+  auto-version:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v2
+      
+      - name: Get pull request labels
+        id: get-labels
+        run: |
+          PR_NUMBER=$(jq --raw-output .pull_request.number "$GITHUB_EVENT_PATH")
+          LABELS=$(gh pr view $PR_NUMBER --json labels --jq '.labels[].name')
+          echo "::set-output name=labels::$LABELS"
+
+      - name: Determine version bump
+        id: version-bump
+        run: |
+          LABELS="${{ steps.get-labels.outputs.labels }}"
+          VERSION_BUMP="minor"  # Default to minor if no labels
+          if [[ "$LABELS" == *"breaking"* ]]; then
+            VERSION_BUMP="major"
+          elif [[ "$LABELS" == *"minor"* ]]; then
+            VERSION_BUMP="minor"
+          elif [[ "$LABELS" == *"patch"* ]]; then
+            VERSION_BUMP="patch"
+          fi
+          echo "version_bump=$VERSION_BUMP" >> $GITHUB_OUTPUT
+          echo "next_version=${{ steps.bump-version.outputs.next-version }}" >> $GITHUB_OUTPUT
+
+      - name: Get current version
+        id: get-version
+        run: |
+          # Try to get version from git tags, fallback to 1.0.0
+          VERSION=$(git describe --tags --abbrev=0 2>/dev/null || echo "1.0.0")
+          # Remove 'v' prefix if present
+          VERSION=${VERSION#v}
+          echo "::set-output name=current-version::$VERSION"
+
+      - name: Bump version
+        id: bump-version
+        uses: christian-draeger/increment-semantic-version@1.2.3
+        with:
+          current-version: ${{ steps.get-version.outputs.current-version }}
+          version-fragment: ${{ steps.version-bump.outputs.version_bump }}
+
+      - name: Create new version tag
+        run: |
+          git tag v${{ steps.bump-version.outputs.next-version }}
+          git push origin v${{ steps.bump-version.outputs.next-version }}

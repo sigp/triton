@@ -27,49 +27,29 @@ jobs:
   version:
     needs: setup
     runs-on: ubuntu-latest
+    outputs:
+      next_version: ${{ steps.get-version.outputs.next_version }}
     steps:
-      - uses: actions/checkout@v4
+      - name: Get auto-version
+        id: get-version
+        uses: ./.github/workflows/auto-version.yml
         with:
-          fetch-depth: 0
+          ref: ${{ github.ref }}
 
-      - name: Get commit message
-        id: commit-msg
-        run: |
-          COMMIT_MSG=$(git log -1 --pretty=%B)
-          echo "commit_msg=$COMMIT_MSG" >> $GITHUB_OUTPUT
-
-      - name: Update versions
+      - name: Update collection versions
         id: update-versions
         run: |
           for collection in ${{ fromJson(needs.setup.outputs.collections) }}; do
             cd $collection
-            current_version=$(grep "version:" galaxy.yml | awk '{print $2}')
-            IFS='.' read -ra VERSION <<< "$current_version"
-            MAJOR=${VERSION[0]}
-            MINOR=${VERSION[1]}
-            PATCH=${VERSION[2]}
-
-            if [[ "${{ steps.commit-msg.outputs.commit_msg }}" =~ ^feat!|BREAKING\ CHANGE ]]; then
-              MAJOR=$((MAJOR + 1))
-              MINOR=0
-              PATCH=0
-            elif [[ "${{ steps.commit-msg.outputs.commit_msg }}" =~ ^feat ]]; then
-              MINOR=$((MINOR + 1))
-              PATCH=0
-            else
-              PATCH=$((PATCH + 1))
-            fi
-
-            new_version="$MAJOR.$MINOR.$PATCH"
-            sed -i "s/version: .*/version: $new_version/" galaxy.yml
-            echo "$collection: $new_version" >> versions.txt
+            sed -i "s/version: .*/version: ${{ steps.get-version.outputs.next_version }}/" galaxy.yml
+            echo "$collection: ${{ steps.get-version.outputs.next_version }}" >> versions.txt
             cd ../..
           done
 
           git config --global user.name "GitHub Actions"
           git config --global user.email "actions@github.com"
           git add .
-          git commit -m "chore: bump collection versions"
+          git commit -m "chore: bump collection versions to ${{ steps.get-version.outputs.next_version }}"
           git push
 
   build:
