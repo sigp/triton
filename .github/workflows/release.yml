@@ -24,8 +24,56 @@ jobs:
           COLLECTIONS=$(find collections -type f -name galaxy.yml | sed 's/\/galaxy.yml//' | jq -R -s -c 'split("\n")[:-1]')
           echo "collections=$COLLECTIONS" >> $GITHUB_OUTPUT
 
-  build:
+  version:
     needs: setup
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Get commit message
+        id: commit-msg
+        run: |
+          COMMIT_MSG=$(git log -1 --pretty=%B)
+          echo "commit_msg=$COMMIT_MSG" >> $GITHUB_OUTPUT
+
+      - name: Update versions
+        id: update-versions
+        run: |
+          for collection in ${{ fromJson(needs.setup.outputs.collections) }}; do
+            cd $collection
+            current_version=$(grep "version:" galaxy.yml | awk '{print $2}')
+            IFS='.' read -ra VERSION <<< "$current_version"
+            MAJOR=${VERSION[0]}
+            MINOR=${VERSION[1]}
+            PATCH=${VERSION[2]}
+
+            if [[ "${{ steps.commit-msg.outputs.commit_msg }}" =~ ^feat!|BREAKING\ CHANGE ]]; then
+              MAJOR=$((MAJOR + 1))
+              MINOR=0
+              PATCH=0
+            elif [[ "${{ steps.commit-msg.outputs.commit_msg }}" =~ ^feat ]]; then
+              MINOR=$((MINOR + 1))
+              PATCH=0
+            else
+              PATCH=$((PATCH + 1))
+            fi
+
+            new_version="$MAJOR.$MINOR.$PATCH"
+            sed -i "s/version: .*/version: $new_version/" galaxy.yml
+            echo "$collection: $new_version" >> versions.txt
+            cd ../..
+          done
+
+          git config --global user.name "GitHub Actions"
+          git config --global user.email "actions@github.com"
+          git add .
+          git commit -m "chore: bump collection versions"
+          git push
+
+  build:
+    needs: version
     runs-on: ubuntu-latest
     strategy:
       matrix:
@@ -53,63 +101,6 @@ jobs:
           name: ${{ steps.artifact-name.outputs.artifact_name }}
           path: ${{ steps.build-collection.outputs.artifact-path }}
 
-      - name: Get current version
-        id: version
-        run: |
-          version=$(grep "version:" "${{ matrix.collection }}/galaxy.yml" | awk '{print $2}')
-          echo "current_version=$version" >> $GITHUB_OUTPUT
-          echo "collection_name=$(basename ${{ matrix.collection }})" >> $GITHUB_OUTPUT
-
-      - name: Determine version bump
-        id: bump
-        run: |
-          COMMIT_MSG=$(git log -1 --pretty=%B)
-          if [[ "$COMMIT_MSG" =~ ^feat!|BREAKING\ CHANGE ]]; then
-            echo "bump=major" >> $GITHUB_OUTPUT
-          elif [[ "$COMMIT_MSG" =~ ^feat ]]; then
-            echo "bump=minor" >> $GITHUB_OUTPUT
-          else
-            echo "bump=patch" >> $GITHUB_OUTPUT
-          fi
-
-      - name: Create new version
-        id: new_version
-        run: |
-          IFS='.' read -ra VERSION <<< "${{ steps.version.outputs.current_version }}"
-          MAJOR=${VERSION[0]}
-          MINOR=${VERSION[1]}
-          PATCH=${VERSION[2]}
-
-          case "${{ steps.bump.outputs.bump }}" in
-            "major")
-              MAJOR=$((MAJOR + 1))
-              MINOR=0
-              PATCH=0
-              ;;
-            "minor")
-              MINOR=$((MINOR + 1))
-              PATCH=0
-              ;;
-            "patch")
-              PATCH=$((PATCH + 1))
-              ;;
-          esac
-
-          echo "new_version=$MAJOR.$MINOR.$PATCH" >> $GITHUB_OUTPUT
-
-      - name: Update version in galaxy.yml
-        run: |
-          cd ${{ matrix.collection }}
-          sed -i "s/version: .*/version: ${{ steps.new_version.outputs.new_version }}/" galaxy.yml
-          git config --global user.name "GitHub Actions"
-          git config --global user.email "actions@github.com"
-          git add galaxy.yml
-          git commit -m "chore: bump version to ${{ steps.new_version.outputs.new_version }}"
-          cd ../..
-
-      - name: Push version updates
-        run: git push
-
   release:
     needs: [setup, build]
     runs-on: ubuntu-latest
@@ -129,5 +120,4 @@ jobs:
           name: Ansible Collections Release
           body: |
             Release of Ansible Collections
-            - sigp.microk8s: ${{ needs.build.outputs['collections-sigp-microk8s-new_version'] }}
-            - sigp.k8s: ${{ needs.build.outputs['collections-sigp-k8s-new_version'] }}
+            $(cat versions.txt)
