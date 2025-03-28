@@ -31,10 +31,13 @@ jobs:
       next_version: ${{ steps.get-version.outputs.next_version }}
     steps:
       - name: Get auto-version
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Call auto-version workflow
         id: get-version
         uses: ./.github/workflows/auto-version.yml
-        with:
-          ref: ${{ github.ref }}
 
       - name: Update collection versions
         id: update-versions
