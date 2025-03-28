@@ -47,7 +47,7 @@ jobs:
         id: version-bump
         run: |
           LABELS="${{ steps.get-labels.outputs.labels }}"
-          VERSION_BUMP="minor"  # Default to minor if no labels
+          VERSION_BUMP="patch"  # Default to minor if no labels
           if [[ "$LABELS" == *"breaking"* ]]; then
             VERSION_BUMP="major"
           elif [[ "$LABELS" == *"minor"* ]]; then
