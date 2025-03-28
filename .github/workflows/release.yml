@@ -41,10 +41,16 @@ jobs:
         with:
           subdirectory: ${{ matrix.collection }}
 
+      - name: Generate artifact name
+        id: artifact-name
+        run: |
+          SANITIZED_NAME=$(echo "${{ matrix.collection }}" | tr '/' '-')
+          echo "artifact_name=$SANITIZED_NAME" >> $GITHUB_OUTPUT
+
       - name: Upload artifact
         uses: actions/upload-artifact@v4
         with:
-          name: ${{ matrix.collection }}-artifact
+          name: ${{ steps.artifact-name.outputs.artifact_name }}
           path: ${{ steps.build-collection.outputs.artifact-path }}
 
       - name: Get current version
@@ -123,5 +129,5 @@ jobs:
           name: Ansible Collections Release
           body: |
             Release of Ansible Collections
-            - sigp.microk8s: ${{ needs.build.outputs['collections/sigp/microk8s-new_version'] }}
-            - sigp.k8s: ${{ needs.build.outputs['collections/sigp/k8s-new_version'] }}
+            - sigp.microk8s: ${{ needs.build.outputs['collections-sigp-microk8s-new_version'] }}
+            - sigp.k8s: ${{ needs.build.outputs['collections-sigp-k8s-new_version'] }}
