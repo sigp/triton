@@ -86,7 +86,8 @@ jobs:
           esac
 
           echo "new_version=$MAJOR.$MINOR.$PATCH" >> $GITHUB_OUTPUT
-          echo "$(basename ${{ matrix.collection }}): $MAJOR.$MINOR.$PATCH" >> versions.txt
+          echo "artifact_name=sigp-$(basename ${{ matrix.collection }})-$MAJOR.$MINOR.$PATCH.tar.gz" >> $GITHUB_OUTPUT
+          mv ${{ steps.build-collection.outputs.artifact-path }} ${{ github.workspace }}/${{ steps.new_version.outputs.artifact_name }}
 
       - name: Update version in galaxy.yml
         run: |
@@ -106,10 +107,12 @@ jobs:
         if: matrix.collection == 'collections/sigp/microk8s'
         uses: softprops/action-gh-release@v1
         with:
-          files: ${{ needs.build-and-release.outputs.artifact-path }}
+          files: |
+            sigp-microk8s-${{ steps.new_version.outputs.new_version }}.tar.gz
+            sigp-k8s-${{ steps.new_version.outputs.new_version }}.tar.gz
           tag_name: collections-v${{ steps.new_version.outputs.new_version }}
           name: Collections Release ${{ steps.new_version.outputs.new_version }}
           body: |
             Release of Ansible Collections
-            Versions:
-            ${{ steps.new_version.outputs.new_version }}
+            - sigp.microk8s: ${{ steps.new_version.outputs.new_version }}
+            - sigp.k8s: ${{ steps.new_version.outputs.new_version }}
