@@ -5,7 +5,9 @@
     name: ethereum-helm-charts
     repo_url: https://ethpandaops.github.io/ethereum-helm-charts
   when: reth_enabled
-  tags: install
+  tags: 
+    - install
+    - add-repo
 
 - name: Install Reth chart
   kubernetes.core.helm:

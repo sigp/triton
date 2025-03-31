@@ -1,0 +1,30 @@
+---
+# Install Lighthouse
+- name: Add Ethereum Helm charts repository
+  kubernetes.core.helm_repository:
+    name: ethereum-helm-charts
+    repo_url: "{{ lighthouse_chart_repo }}"
+  when: "'lighthouse' in apps_enabled"
+  tags: 
+    - install
+    - add-repo
+
+- name: Install Lighthouse chart
+  kubernetes.core.helm:
+    name: "{{ lighthouse_release_name }}"
+    chart_ref: "{{ lighthouse_chart_name }}"
+    chart_version: "{{ lighthouse_chart_version }}"
+    release_namespace: "{{ lighthouse_namespace }}"
+    create_namespace: true
+    values:
+      mode: "{{ lighthouse_mode }}"
+      replicas: "{{ lighthouse_replicas }}"
+      jwt: "{{ lighthouse_jwt_secret }}"
+      persistence:
+        enabled: "{{ lighthouse_persistence_enabled }}"
+        size: "{{ lighthouse_persistence_size }}"
+      resources: "{{ lighthouse_resources }}"
+      extraArgs: "{{ lighthouse_extra_args }}"
+    state: present
+  when: "'lighthouse' in apps_enabled"
+  tags: install

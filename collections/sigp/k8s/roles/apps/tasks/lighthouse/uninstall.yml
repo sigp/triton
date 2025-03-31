@@ -1,0 +1,17 @@
+---
+# Uninstall Lighthouse
+- name: Uninstall Lighthouse chart
+  kubernetes.core.helm:
+    name: "{{ lighthouse_release_name }}"
+    release_namespace: "{{ lighthouse_namespace }}"
+    state: absent
+  when: "'lighthouse' in apps_enabled"
+  tags: uninstall
+
+- name: Remove namespace (if empty)
+  kubernetes.core.k8s:
+    kind: Namespace
+    name: "{{ lighthouse_namespace }}"
+    state: absent
+  when: "'lighthouse' in apps_enabled"
+  tags: uninstall

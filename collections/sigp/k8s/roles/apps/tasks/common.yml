@@ -1,0 +1,16 @@
+---
+# Common tasks shared across all applications
+- name: Verify apps namespace exists
+  kubernetes.core.k8s:
+    kind: Namespace
+    name: "{{ apps_namespace }}"
+    state: present
+  tags: always
+
+- name: Validate apps configuration
+  assert:
+    that:
+      - "apps_enabled is defined"
+      - "apps_namespace is defined"
+    fail_msg: "Required apps configuration missing"
+  tags: always

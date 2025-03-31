@@ -5,20 +5,6 @@
   include_tasks: common.yml
   tags: always
 
-- name: Include Lighthouse tasks if enabled
-  include_tasks: lighthouse/install.yml
-  when: "'lighthouse' in apps_enabled"
-  tags: install
-
-- name: Include Lighthouse upgrade tasks if enabled
-  include_tasks: lighthouse/upgrade.yml
-  when: "'lighthouse' in apps_enabled"
-  tags: upgrade
-
-- name: Include Lighthouse uninstall tasks if enabled
-  include_tasks: lighthouse/uninstall.yml
-  when: "'lighthouse' in apps_enabled"
-  tags: uninstall
 
 - name: Include Reth tasks if enabled
   include_tasks: reth/install.yml
