@@ -1,0 +1,67 @@
+---
+# tasks file for admin dashboard setup
+- name: Create dashboard admin service account
+  kubernetes.core.k8s:
+    state: present
+    definition:
+      apiVersion: v1
+      kind: ServiceAccount
+      metadata:
+        name: dashboard-admin
+        namespace: kube-system
+
+- name: Create dashboard admin cluster role binding
+  kubernetes.core.k8s:
+    state: present
+    definition:
+      apiVersion: rbac.authorization.k8s.io/v1
+      kind: ClusterRoleBinding
+      metadata:
+        name: dashboard-admin
+      roleRef:
+        apiGroup: rbac.authorization.k8s.io
+        kind: ClusterRole
+        name: cluster-admin
+      subjects:
+        - kind: ServiceAccount
+          name: dashboard-admin
+          namespace: kube-system
+
+- name: Get dashboard admin token secret name
+  kubernetes.core.k8s_info:
+    kind: Secret
+    namespace: kube-system
+    label_selectors:
+      - "kubernetes.io/service-account.name=dashboard-admin"
+  register: dashboard_secret
+
+- name: Extract and return dashboard token
+  kubernetes.core.k8s:
+    state: present
+    definition:
+      apiVersion: v1
+      kind: Secret
+      metadata:
+        name: dashboard-admin-token
+        namespace: kube-system
+        annotations:
+          kubernetes.io/service-account.name: "dashboard-admin"
+      type: kubernetes.io/service-account-token
+  when: dashboard_secret.resources|length == 0
+  register: token_creation
+
+- name: Get dashboard token
+  command: >
+    microk8s kubectl get secret dashboard-admin-token -n kube-system
+    -o jsonpath='{.data.token}' | base64 -d
+  register: dashboard_token
+  changed_when: false
+
+- name: Set dashboard token as fact
+  set_fact:
+    dashboard_token: "{{ dashboard_token.stdout }}"
+
+- name: Display dashboard token (for debugging)
+  debug:
+    msg: "Dashboard token: {{ dashboard_token }}"
+    verbosity: 1
