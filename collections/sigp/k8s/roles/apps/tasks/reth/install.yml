@@ -1,0 +1,35 @@
+---
+# Install Reth
+- name: Add Ethereum Helm Charts repository
+  kubernetes.core.helm_repository:
+    name: ethereum-helm-charts
+    repo_url: https://ethpandaops.github.io/ethereum-helm-charts
+  when: reth_enabled
+  tags: install
+
+- name: Install Reth chart
+  kubernetes.core.helm:
+    name: "{{ reth_release_name }}"
+    chart_ref: "{{ reth_chart_name }}"
+    chart_version: "{{ reth_chart_version }}"
+    release_namespace: "{{ reth_namespace }}"
+    create_namespace: true
+    values:
+      image:
+        repository: "ethpandaops/reth"
+        tag: "main"
+      jwt: "{{ reth_jwt_secret }}"
+      replicas: "{{ reth_replicas }}"
+      persistence:
+        enabled: "{{ reth_persistence_enabled }}"
+        size: "{{ reth_persistence_size }}"
+      resources: "{{ reth_resources }}"
+      extraArgs: "{{ reth_extra_args }}"
+      httpPort: "{{ reth_http_port }}"
+      wsPort: "{{ reth_ws_port }}"
+      authPort: "{{ reth_auth_port }}"
+      p2pPort: "{{ reth_p2p_port }}"
+      metricsPort: "{{ reth_metrics_port }}"
+    state: present
+  when: reth_enabled
+  tags: install

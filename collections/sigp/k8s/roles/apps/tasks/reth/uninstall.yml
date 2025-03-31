@@ -1,0 +1,17 @@
+---
+# Uninstall Reth
+- name: Uninstall Reth chart
+  kubernetes.core.helm:
+    name: "{{ reth_release_name }}"
+    release_namespace: "{{ reth_namespace }}"
+    state: absent
+  when: reth_enabled
+  tags: uninstall
+
+- name: Remove namespace (if empty)
+  kubernetes.core.k8s:
+    kind: Namespace
+    name: "{{ reth_namespace }}"
+    state: absent
+  when: reth_enabled
+  tags: uninstall
