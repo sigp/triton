@@ -53,7 +53,7 @@
 - name: Get dashboard token
   command: >
     {{ kubectl_command | default('kubectl') }} get secret dashboard-admin-token -n kube-system
-    -o jsonpath='{.data.token}' | base64 -d
+    -o jsonpath='{.data.token}' | base64 --decode
   register: dashboard_token
   changed_when: false
 
