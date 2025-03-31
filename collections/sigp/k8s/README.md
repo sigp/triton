@@ -55,3 +55,37 @@ github_actions_enable_cluster_admin: false
 1. Include the role in your playbook
 2. Override any default variables as needed
 3. Run the playbook against your Kubernetes cluster
+
+### admin
+
+Kubernetes administration tasks including dashboard setup.
+
+#### Dashboard Configuration
+
+The dashboard task creates a service account with admin privileges for accessing the Kubernetes dashboard.
+
+Available variables:
+```yaml
+# kubectl command to use (defaults to 'kubectl')
+kubectl_command: "microk8s kubectl"
+```
+
+#### Example Playbook
+
+```yaml
+- hosts: localhost
+  connection: local
+  tasks:
+    - include_role:
+        name: sigp.k8s.admin
+        tasks_from: dashboard
+      vars:
+        kubectl_command: "microk8s kubectl"
+```
+
+#### Usage
+
+1. Include the dashboard task in your playbook
+2. Set kubectl_command if using microk8s or custom kubectl
+3. The dashboard token will be available as `dashboard_token` fact
+4. For debugging, run with `-v` to see the token
