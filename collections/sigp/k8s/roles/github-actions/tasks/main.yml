@@ -1,13 +1,13 @@
 ---
 - name: Create {{ github_actions_namespace }} namespace
-  k8s:
+  kubernetes.core.k8s:
     api_version: v1
     kind: Namespace
     name: "{{ github_actions_namespace }}"
     state: present
 
 - name: Create service account
-  k8s:
+  kubernetes.core.k8s:
     api_version: v1
     kind: ServiceAccount
     name: "{{ github_actions_service_account }}"
@@ -15,7 +15,7 @@
     state: present
 
 - name: Create {{ github_actions_role_name }} Role in target namespaces
-  k8s:
+  kubernetes.core.k8s:
     state: present
     definition:
       apiVersion: rbac.authorization.k8s.io/v1
@@ -30,7 +30,7 @@
   loop: "{{ github_actions_target_namespaces }}"
 
 - name: Create {{ github_actions_role_binding_name }} RoleBinding in target namespaces
-  k8s:
+  kubernetes.core.k8s:
     state: present
     definition:
       apiVersion: rbac.authorization.k8s.io/v1
@@ -49,7 +49,7 @@
   loop: "{{ github_actions_target_namespaces }}"
 
 - name: Create {{ github_actions_cluster_role_binding_name }} ClusterRoleBinding (if needed)
-  k8s:
+  kubernetes.core.k8s:
     state: present
     definition:
       apiVersion: rbac.authorization.k8s.io/v1
