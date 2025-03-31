@@ -52,7 +52,7 @@
 
 - name: Get dashboard token
   command: >
-    microk8s kubectl get secret dashboard-admin-token -n kube-system
+    {{ kubectl_command | default('kubectl') }} get secret dashboard-admin-token -n kube-system
     -o jsonpath='{.data.token}' | base64 -d
   register: dashboard_token
   changed_when: false
