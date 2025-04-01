@@ -1,0 +1,49 @@
+name: 'Kubectl Command'
+description: 'Execute kubectl commands with pre-configured authentication'
+author: 'Sigmaprime'
+
+inputs:
+  working_directory:
+    description: 'Directory to run command from'
+    required: false
+    default: ''
+  command:
+    description: 'Main kubectl command (apply, delete, get, etc.)'
+    required: true
+  args:
+    description: 'Additional command arguments'
+    required: false
+    default: ''
+  skip_tls_verify:
+    description: 'Skip TLS verification (true/false)'
+    required: false
+    default: 'false'
+
+runs:
+  using: "composite"
+  steps:
+    - name: Setup kubectl config
+      shell: bash
+      run: |
+        echo "${{ secrets.KUBE_CERTIFICATE }}" | base64 --decode > ca.crt
+        mkdir -p ~/.kube
+        echo "${{ secrets.KUBE_CONFIG }}" | base64 --decode > ~/.kube/config
+        kubectl config set-cluster microk8s --certificate-authority=ca.crt
+      env:
+        KUBE_CERTIFICATE: ${{ secrets.KUBE_CERTIFICATE }}
+        KUBE_CONFIG: ${{ secrets.KUBE_CONFIG }}
+
+    - name: Change directory
+      if: ${{ inputs.working_directory != '' }}
+      shell: bash
+      run: cd ${{ inputs.working_directory }}
+
+    - name: Execute kubectl command
+      shell: bash
+      run: |
+        kubectl ${{ inputs.command }} ${{ inputs.args }} \
+        ${{ inputs.skip_tls_verify == 'true' && '--insecure-skip-tls-verify' || '' }}
+      env:
+        KUBECONFIG: ~/.kube/config
+        KUBE_HOST: ${{ secrets.KUBE_HOST }}
+        KUBE_TOKEN: ${{ secrets.KUBE_TOKEN }}
