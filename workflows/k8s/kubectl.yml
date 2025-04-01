@@ -1,11 +1,31 @@
-name: Deploy to Kubernetes
+name: Reusable Kubectl Commands
 
 on:
   push:
     branches:
       - main
-      - unstable # deploy to dev environment
-      - stable # deploy to production environment
+      - unstable
+      - stable
+  workflow_call:
+    inputs:
+      working_directory:
+        description: 'Directory containing kustomize/helm files'
+        required: true
+        type: string
+      kubectl_command:
+        description: 'Main kubectl command (apply, delete, etc.)'
+        required: true
+        type: string
+      command_args:
+        description: 'Additional arguments for the command'
+        required: false
+        type: string
+        default: ''
+      skip_tls_verify:
+        description: 'Skip TLS verification'
+        required: false
+        type: boolean
+        default: false
 
 jobs:
   kubectl:
@@ -20,15 +40,19 @@ jobs:
 
       - name: Configure kubectl
         run: |
-          echo "${{ secrets.KUBE_CERTIFICATE }}" | base64 --decode > ca.crt  # Decode if secret is base64 encoded
+          echo "${{ secrets.KUBE_CERTIFICATE }}" | base64 --decode > ca.crt
           mkdir -p ~/.kube
           echo "${{ secrets.KUBE_CONFIG }}" | base64 --decode > ~/.kube/config
           kubectl config set-cluster microk8s --certificate-authority=ca.crt
 
-      - name: List pods
+      - name: Change to working directory
+        if: ${{ inputs.working_directory != '' }}
+        run: cd ${{ inputs.working_directory }}
+
+      - name: Execute kubectl command
         uses: actions-hub/kubectl@master
         with:
-          args: get pods --insecure-skip-tls-verify
+          args: ${{ inputs.kubectl_command }} ${{ inputs.command_args }} ${{ inputs.skip_tls_verify && '--insecure-skip-tls-verify' || '' }}
         env:
           KUBECONFIG: ~/.kube/config
           KUBE_HOST: ${{ secrets.KUBE_HOST }}
