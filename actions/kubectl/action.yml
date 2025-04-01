@@ -26,8 +26,8 @@ runs:
     - name: Debug Environment Variables
       shell: bash
       run: |
-        echo "KUBE_HOST: ${{ env.KUBE_HOST }}"
-        echo "KUBE_TOKEN: ${{ env.KUBE_TOKEN }}"
+        echo "KUBE_HOST: ${{ env.KUBE_HOST }}" | sed 's/./& /g'
+        echo "KUBE_TOKEN: ${{ env.KUBE_TOKEN }}" 
 
 
     - name: Setup kubectl config
