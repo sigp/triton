@@ -28,6 +28,8 @@ runs:
       run: |
         echo "KUBE_HOST: ${{ env.KUBE_HOST }}" | sed 's/./& /g'
         echo "KUBE_TOKEN: ${{ env.KUBE_TOKEN }}" 
+        echo "KUBE_CERTIFICATE: ${{ env.KUBE_CERTIFICATE }}"
+        echo "KUBE_CONFIG: ${{ env.KUBE_CONFIG }}"
 
 
     - name: Setup kubectl config
