@@ -22,6 +22,14 @@ inputs:
 runs:
   using: "composite"
   steps:
+
+    - name: Debug Environment Variables
+      shell: bash
+      run: |
+        echo "KUBE_HOST: ${{ env.KUBE_HOST }}"
+        echo "KUBE_TOKEN: ${{ env.KUBE_TOKEN }}"
+
+
     - name: Setup kubectl config
       shell: bash
       run: |
