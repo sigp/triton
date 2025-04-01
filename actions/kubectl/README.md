@@ -10,7 +10,7 @@ steps:
   - uses: actions/checkout@v3
   
   - name: Apply kustomize configuration
-    uses: ./actions/kubectl
+    uses: sigp/triton/actions/kubectl@main
     with:
       working_directory: 'k8s/overlays/dev'
       command: 'kustomize'
@@ -23,7 +23,6 @@ You must configure these secrets in your repository:
 ```yaml
 env:
   KUBE_CERTIFICATE: ${{ secrets.KUBE_CERTIFICATE }}
-  KUBE_CONFIG: ${{ secrets.KUBE_CONFIG }}
   KUBE_HOST: ${{ secrets.KUBE_HOST }}
   KUBE_TOKEN: ${{ secrets.KUBE_TOKEN }}
 ```
@@ -43,14 +42,13 @@ jobs:
       - uses: actions/checkout@v3
       
       - name: Deploy application
-        uses: ./actions/kubectl
+        uses: sigp/triton/actions/kubectl@main
         with:
           working_directory: 'k8s/overlays/prod'
           command: 'apply'
           args: '-f deployment.yaml'
         env:
           KUBE_CERTIFICATE: ${{ secrets.KUBE_CERTIFICATE }}
-          KUBE_CONFIG: ${{ secrets.KUBE_CONFIG }}
           KUBE_HOST: ${{ secrets.KUBE_HOST }}
           KUBE_TOKEN: ${{ secrets.KUBE_TOKEN }}
 ```
