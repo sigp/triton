@@ -1,0 +1,38 @@
+---
+# Common configuration
+apps_enabled: []
+apps_namespace: "default"
+
+# Lighthouse configuration
+lighthouse_enabled: false
+lighthouse_chart_name: "sigp/lighthouse"
+lighthouse_chart_version: "4.1.0"
+lighthouse_release_name: "lighthouse"
+lighthouse_namespace: "{{ apps_namespace }}"
+lighthouse_mode: "beacon"
+lighthouse_network: "mainnet"
+lighthouse_replicas: 1
+lighthouse_persistence_enabled: true
+lighthouse_persistence_size: "50Gi"
+lighthouse_jwt_secret: ""
+lighthouse_resources: {}
+lighthouse_extra_args: []
+
+# Reth configuration  
+reth_enabled: false
+reth_chart_name: "ethereum-helm-charts/reth"
+reth_chart_version: "0.0.15"
+reth_release_name: "reth"
+reth_namespace: "{{ apps_namespace }}"
+reth_network: "mainnet"
+reth_replicas: 1
+reth_persistence_enabled: true
+reth_persistence_size: "100Gi"
+reth_jwt_secret: ""
+reth_resources: {}
+reth_extra_args: []
+reth_http_port: 8545
+reth_ws_port: 8546
+reth_auth_port: 8551
+reth_p2p_port: 30303
+reth_metrics_port: 9001

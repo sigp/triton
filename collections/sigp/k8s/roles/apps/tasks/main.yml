@@ -1,0 +1,22 @@
+---
+# Main tasks file for apps role
+
+- name: Include common tasks
+  include_tasks: common.yml
+  tags: always
+
+
+- name: Include Reth tasks if enabled
+  include_tasks: reth/install.yml
+  when: "'reth' in apps_enabled"
+  tags: install
+
+- name: Include Reth upgrade tasks if enabled
+  include_tasks: reth/upgrade.yml
+  when: "'reth' in apps_enabled"
+  tags: upgrade
+
+- name: Include Reth uninstall tasks if enabled
+  include_tasks: reth/uninstall.yml
+  when: "'reth' in apps_enabled"
+  tags: uninstall
