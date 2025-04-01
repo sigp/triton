@@ -2,10 +2,8 @@ name: Reusable Kubectl Commands
 
 on:
   push:
-    branches:
-      - main
-      - unstable
-      - stable
+    paths:
+      - 'k8s/**'
   workflow_call:
     inputs:
       working_directory:
