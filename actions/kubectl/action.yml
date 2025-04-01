@@ -53,6 +53,6 @@ runs:
       with:
           args: ${{ inputs.command }} ${{ inputs.args }} \ ${{ inputs.skip_tls_verify == 'true' && '--insecure-skip-tls-verify' || '' }}
       env:
-        KUBECONFIG: ~/.kube/config
+        KUBE_CERTIFICATE: ${{ env.KUBE_CERTIFICATE }}
         KUBE_HOST: ${{ env.KUBE_HOST }}
         KUBE_TOKEN: ${{ env.KUBE_TOKEN }}
