@@ -25,13 +25,13 @@ runs:
     - name: Setup kubectl config
       shell: bash
       run: |
-        echo "${{ secrets.KUBE_CERTIFICATE }}" | base64 --decode > ca.crt
+        echo "${{ env.KUBE_CERTIFICATE }}" | base64 --decode > ca.crt
         mkdir -p ~/.kube
-        echo "${{ secrets.KUBE_CONFIG }}" | base64 --decode > ~/.kube/config
+        echo "${{ env.KUBE_CONFIG }}" | base64 --decode > ~/.kube/config
         kubectl config set-cluster microk8s --certificate-authority=ca.crt
       env:
-        KUBE_CERTIFICATE: ${{ secrets.KUBE_CERTIFICATE }}
-        KUBE_CONFIG: ${{ secrets.KUBE_CONFIG }}
+        KUBE_CERTIFICATE: ${{ env.KUBE_CERTIFICATE }}
+        KUBE_CONFIG: ${{ env.KUBE_CONFIG }}
 
     - name: Change directory
       if: ${{ inputs.working_directory != '' }}
@@ -45,5 +45,5 @@ runs:
         ${{ inputs.skip_tls_verify == 'true' && '--insecure-skip-tls-verify' || '' }}
       env:
         KUBECONFIG: ~/.kube/config
-        KUBE_HOST: ${{ secrets.KUBE_HOST }}
-        KUBE_TOKEN: ${{ secrets.KUBE_TOKEN }}
+        KUBE_HOST: ${{ env.KUBE_HOST }}
+        KUBE_TOKEN: ${{ env.KUBE_TOKEN }}
