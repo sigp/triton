@@ -1,4 +1,9 @@
 ---
+
+- name: Include dependencies
+  include_tasks: dependencies.yml
+
+  
 # tasks file for admin dashboard setup
 - name: Create dashboard admin service account
   kubernetes.core.k8s:
