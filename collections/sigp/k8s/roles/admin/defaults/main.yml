@@ -1,0 +1,26 @@
+---
+# kubectl command to use (defaults to 'kubectl')
+kubectl_command: "kubectl"
+
+# Node Labeling Configuration
+node_labeling_enabled: true
+
+# Standard labels to apply to all nodes
+standard_labels:
+  - "app.kubernetes.io/part-of=ethereum-blockbuilder"
+  - "node-role.kubernetes.io/worker=true"
+
+# Whether to apply fact-based labels from Ansible facts
+enable_fact_labels: true
+
+# Prefix for fact-based labels
+fact_label_prefix: "node.kubernetes.io"
+
+# Hardware specifications labels
+hardware_specs:
+  cpu: "unknown"
+  memory: "unknown"
+  storage: "unknown"
+
+# Role-specific custom labels
+node_label_dict: {}
