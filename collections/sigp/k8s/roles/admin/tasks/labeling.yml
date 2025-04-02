@@ -1,0 +1,111 @@
+---
+- name: Validate node labeling prerequisites
+  block:
+    - name: Validate node hostname
+      assert:
+        that: inventory_hostname is defined and inventory_hostname != ""
+        fail_msg: "Invalid node hostname"
+
+    - name: Validate standard labels format
+      assert:
+        that: item.split('=')[1] | regex_search('^[a-z0-9A-Z][-_\\.a-z0-9A-Z]*$') is match
+        fail_msg: "Label value must conform to Kubernetes naming convention"
+      loop: "{{ standard_labels }}"
+      when: standard_labels is defined
+  when: node_labeling_enabled
+
+- name: Get current node labels
+  community.kubernetes.k8s_info:
+    api_version: v1
+    kind: Node
+    name: "{{ inventory_hostname }}"
+    kubeconfig: "{{ kubeconfig | default(omit) }}"
+    context: "{{ context | default(omit) }}"
+  register: node_info
+  when: node_labeling_enabled
+
+- name: Set fact for current labels
+  set_fact:
+    current_labels: "{{ node_info.resources[0].metadata.labels | default({}) }}"
+  when: node_labeling_enabled
+
+- name: Apply standard labels
+  community.kubernetes.k8s:
+    api_version: v1
+    kind: Node
+    name: "{{ inventory_hostname }}"
+    state: present
+    merge_type: strategic-merge
+    kubeconfig: "{{ kubeconfig | default(omit) }}"
+    context: "{{ context | default(omit) }}"
+    definition:
+      metadata:
+        labels:
+          "{{ item.split('=')[0] }}": "{{ item.split('=')[1] }}"
+  loop: "{{ standard_labels }}"
+  when:
+    - node_labeling_enabled
+    - standard_labels is defined
+  register: standard_label_result
+
+- name: Apply fact-based labels
+  community.kubernetes.k8s:
+    api_version: v1
+    kind: Node
+    name: "{{ inventory_hostname }}"
+    state: present
+    merge_type: strategic-merge
+    kubeconfig: "{{ kubeconfig | default(omit) }}"
+    context: "{{ context | default(omit) }}"
+    definition:
+      metadata:
+        labels:
+          "{{ fact_label_prefix }}/instance-type": "{{ ansible_processor_cores }}c-{{ (ansible_memtotal_mb / 1024) | round(0, 'floor') }}g"
+          "{{ fact_label_prefix }}/os": "{{ ansible_distribution | lower }}"
+          "{{ fact_label_prefix }}/os-version": "{{ ansible_distribution_version }}"
+          "{{ fact_label_prefix }}/arch": "{{ ansible_architecture }}"
+          "hardware.cpu/cores": "{{ ansible_processor_cores }}"
+          "hardware.memory/total-gb": "{{ (ansible_memtotal_mb / 1024) | round(0, 'floor') }}"
+          "hardware.profile/class": >-
+            {% if ansible_processor_cores >= 16 and (ansible_memtotal_mb / 1024) >= 64 %}high-compute
+            {% elif ansible_processor_cores >= 8 and (ansible_memtotal_mb / 1024) >= 32 %}medium-compute
+            {% else %}standard{% endif %}
+  when:
+    - node_labeling_enabled
+    - enable_fact_labels
+  register: fact_label_result
+
+- name: Apply hardware specs labels
+  community.kubernetes.k8s:
+    api_version: v1
+    kind: Node
+    name: "{{ inventory_hostname }}"
+    state: present
+    merge_type: strategic-merge
+    kubeconfig: "{{ kubeconfig | default(omit) }}"
+    context: "{{ context | default(omit) }}"
+    definition:
+      metadata:
+        labels:
+          "node.kubernetes.io/cpu": "{{ hardware_specs.cpu }}"
+          "node.kubernetes.io/memory": "{{ hardware_specs.memory }}"
+          "node.kubernetes.io/storage": "{{ hardware_specs.storage }}"
+  when:
+    - node_labeling_enabled
+    - hardware_specs.cpu != "unknown" or hardware_specs.memory != "unknown" or hardware_specs.storage != "unknown"
+  register: hw_label_result
+
+- name: Verify labels were applied
+  community.kubernetes.k8s_info:
+    api_version: v1
+    kind: Node
+    name: "{{ inventory_hostname }}"
+    kubeconfig: "{{ kubeconfig | default(omit) }}"
+    context: "{{ context | default(omit) }}"
+  register: final_node_info
+  when: node_labeling_enabled
+
+- name: Show labeling results
+  debug:
+    msg: "Node {{ inventory_hostname }} now has {{ final_node_info.resources[0].metadata.labels | length }} labels"
+  when: node_labeling_enabled

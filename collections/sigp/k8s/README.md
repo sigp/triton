@@ -89,3 +89,54 @@ kubectl_command: "microk8s kubectl"
 2. Set kubectl_command if using microk8s or custom kubectl
 3. The dashboard token will be available as `dashboard_token` fact
 4. For debugging, run with `-v` to see the token
+#### Node Labeling
+
+Applies standard and fact-based labels to Kubernetes nodes.
+
+##### Configuration
+
+```yaml
+# Enable/disable node labeling
+node_labeling_enabled: true
+
+# Standard labels to apply
+standard_labels:
+  - "app.kubernetes.io/part-of=ethereum-blockbuilder"
+  - "node-role.kubernetes.io/worker=true"
+
+# Enable fact-based labeling
+enable_fact_labels: true
+
+# Hardware specs
+hardware_specs:
+  cpu: "unknown"
+  memory: "unknown"
+  storage: "unknown"
+
+# Role-specific labels
+node_label_dict: {}
+```
+
+##### Example Playbook
+
+```yaml
+- hosts: k8s_worker
+  roles:
+    - role: sigp.k8s.admin
+      tasks_from: labeling
+      vars:
+        standard_labels:
+          - "app.kubernetes.io/part-of=my-app"
+          - "node-role.kubernetes.io/gpu=true"
+        hardware_specs:
+          cpu: "16"
+          memory: "128gb"
+```
+
+##### Usage
+
+1. Include the labeling task in your playbook
+2. Configure labels through variables
+3. Run against worker nodes to apply labels
+4. Verify with `kubectl get nodes --show-labels`
+
