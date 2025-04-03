@@ -1,4 +1,10 @@
 ---
+
+  
+- name: Include dependencies
+  include_tasks: dependencies.yml
+  
+
 - name: Validate node labeling prerequisites
   block:
     - name: Validate node hostname
