@@ -48,6 +48,13 @@ runs:
       shell: bash
       run: cd ${{ inputs.working_directory }}
 
+    - name: Debug working directory
+      shell: bash
+      run: |
+        echo "Current working directory: $(pwd)"
+        echo "Contents of the directory:"
+        ls -la
+
     - name: Execute kubectl command
       uses: actions-hub/kubectl@master
       with:
