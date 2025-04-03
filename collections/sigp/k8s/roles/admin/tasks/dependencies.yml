@@ -16,4 +16,5 @@
     name:
       - openshift>=0.6
       - PyYAML>=3.11
+      - kubernetes
     state: present
