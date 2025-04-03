@@ -51,7 +51,7 @@ runs:
     - name: Execute kubectl command
       uses: actions-hub/kubectl@master
       with:
-          args: ${{ inputs.command }} ${{ inputs.args }}  ${{ inputs.skip_tls_verify == 'true' && '--insecure-skip-tls-verify' || '' }}
+          args: ${{ inputs.command }}  ${{ inputs.skip_tls_verify == 'true' && '--insecure-skip-tls-verify' || '' }} ${{ inputs.args }} 
       env:
         KUBE_CERTIFICATE: ${{ env.KUBE_CERTIFICATE }}
         KUBE_HOST: ${{ env.KUBE_HOST }}
