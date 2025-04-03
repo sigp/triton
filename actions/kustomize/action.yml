@@ -5,7 +5,7 @@ author: 'Sigmaprime'
 inputs:
   kustomize_version:
     description: 'The Kustomize version to use'
-    required: true
+    default: '3.0.0'
   kustomize_build_dir:
     description: 'Directory containing kustomization.yaml'
     required: false
