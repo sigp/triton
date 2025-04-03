@@ -120,11 +120,30 @@
         type: kubernetes.io/service-account-token
     register: token_secret
 
+  # Get cluster CA certificate
+  - name: Get cluster CA certificate
+    kubernetes.core.k8s_info:
+      api_version: v1
+      kind: Secret
+      name: "{{ token_secret.result.metadata.name }}"
+      namespace: "{{ github_actions_sa_namespace | default('ci-cd') }}"
+    register: cluster_ca
+
+  # Get ServiceAccount token
+  - name: Get ServiceAccount token
+    kubernetes.core.k8s_info:
+      api_version: v1
+      kind: Secret
+      name: "{{ token_secret.result.metadata.name }}"
+      namespace: "{{ github_actions_sa_namespace | default('ci-cd') }}"
+    register: sa_token
+
   # Display GitHub Actions secrets configuration
   - name: Display GitHub Action secrets configuration
     debug:
       msg: |
         Add these secrets to GitHub Actions:
         
-        KUBE_CERTIFICATE: "{{ ca_cert.stdout | b64encode }}"
-        KUBE_TOKEN: "{{ token_output.stdout }}"
+        KUBE_HOST: "https://kubernetes.default.svc"
+        KUBE_CERTIFICATE: "{{ cluster_ca.resources[0].data['ca.crt'] }}"
+        KUBE_TOKEN: "{{ sa_token.resources[0].data.token | b64decode }}"

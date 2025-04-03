@@ -45,6 +45,7 @@ runs:
         kustomize_version: ${{ inputs.kustomize_version }}
         kustomize_build_dir: ${{ inputs.kustomize_build_dir }}
         kustomize_comment: ${{ inputs.kustomize_comment }}
+        kustomize_install: true
         kustomize_output_file: ${{ inputs.kustomize_output_file }}
         kustomize_build_options: ${{ inputs.kustomize_build_options }}
         enable_alpha_plugins: ${{ inputs.enable_alpha_plugins }}
