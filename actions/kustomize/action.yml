@@ -1,0 +1,55 @@
+name: 'Kustomize Build'
+description: 'Wrapper for kustomize-github-action with standardized configuration'
+author: 'Sigmaprime'
+
+inputs:
+  kustomize_version:
+    description: 'The Kustomize version to use'
+    required: true
+  kustomize_build_dir:
+    description: 'Directory containing kustomization.yaml'
+    required: false
+    default: '.'
+  kustomize_comment:
+    description: 'Whether to comment on GitHub PRs'
+    required: false
+    default: 'false'
+  kustomize_output_file:
+    description: 'Path to write build output'
+    required: false
+    default: ''
+  kustomize_build_options:
+    description: 'Additional build options'
+    required: false
+    default: ''
+  enable_alpha_plugins:
+    description: 'Enable alpha plugins'
+    required: false
+    default: 'false'
+  working_directory:
+    description: 'Directory to run command from'
+    required: false
+    default: ''
+
+runs:
+  using: "composite"
+  steps:
+    - name: Change to working directory
+      if: ${{ inputs.working_directory != '' }}
+      shell: bash
+      run: cd ${{ inputs.working_directory }}
+
+    - name: Run Kustomize Build
+      uses: karancode/kustomize-github-action@master
+      with:
+        kustomize_version: ${{ inputs.kustomize_version }}
+        kustomize_build_dir: ${{ inputs.kustomize_build_dir }}
+        kustomize_comment: ${{ inputs.kustomize_comment }}
+        kustomize_output_file: ${{ inputs.kustomize_output_file }}
+        kustomize_build_options: ${{ inputs.kustomize_build_options }}
+        enable_alpha_plugins: ${{ inputs.enable_alpha_plugins }}
+
+outputs:
+  kustomize_build_output:
+    description: 'The output from kustomize build'
+    value: ${{ steps.kustomize_build.outputs.kustomize_build_output }}
