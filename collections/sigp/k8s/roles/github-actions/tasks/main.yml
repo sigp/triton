@@ -1,4 +1,17 @@
 ---
+  # Create namespace if it doesn't exist
+  - name: Ensure namespace exists
+    kubernetes.core.k8s:
+      state: present
+      definition:
+        apiVersion: v1
+        kind: Namespace
+        metadata:
+          name: "{{ github_actions_sa_namespace | default('ci-cd') }}"
+          labels:
+            app.kubernetes.io/managed-by: ansible
+            app.kubernetes.io/part-of: ci-cd
+
   # Define a single ServiceAccount in a dedicated namespace (default: ci-cd)
   - name: Create GitHub Actions Service Account
     kubernetes.core.k8s:
@@ -44,6 +57,21 @@
         - apiGroups: [""]
           resources: ["pods/log", "pods/exec"]
           verbs: ["get", "list", "create"]
+
+  # Create target namespaces if they don't exist
+  - name: Ensure target namespaces exist
+    kubernetes.core.k8s:
+      state: present
+      definition:
+        apiVersion: v1
+        kind: Namespace
+        metadata:
+          name: "{{ item }}"
+          labels:
+            app.kubernetes.io/managed-by: ansible
+            app.kubernetes.io/part-of: ci-cd
+    loop: "{{ github_actions_target_namespaces }}"
+    when: github_actions_create_namespaces | default(false) | bool
 
   # Bind the ServiceAccount to the ClusterRole within each target namespace
   - name: Create RoleBinding for GitHub Actions ServiceAccount in each target namespace
@@ -91,3 +119,12 @@
             kubernetes.io/service-account.name: "{{ github_actions_sa_name | default('github-actions') }}"
         type: kubernetes.io/service-account-token
     register: token_secret
+
+  # Display GitHub Actions secrets configuration
+  - name: Display GitHub Action secrets configuration
+    debug:
+      msg: |
+        Add these secrets to GitHub Actions:
+        
+        KUBE_CERTIFICATE: "{{ ca_cert.stdout | b64encode }}"
+        KUBE_TOKEN: "{{ token_output.stdout }}"
