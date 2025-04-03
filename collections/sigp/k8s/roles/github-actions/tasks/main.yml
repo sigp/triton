@@ -1,5 +1,6 @@
 ---
-  - name: Create GitHub Actions Service Account for deployments
+  # Define a single ServiceAccount in a dedicated namespace (default: ci-cd)
+  - name: Create GitHub Actions Service Account
     kubernetes.core.k8s:
       state: present
       definition:
@@ -7,75 +8,52 @@
         kind: ServiceAccount
         metadata:
           name: "{{ github_actions_sa_name | default('github-actions') }}"
-          namespace: "{{ item }}"
+          namespace: "{{ github_actions_sa_namespace | default('ci-cd') }}"
           labels:
             app.kubernetes.io/managed-by: ansible
             app.kubernetes.io/part-of: ci-cd
-    loop: "{{ github_actions_target_namespaces }}"
-  
-  - name: Create Role with permissions for GitHub Actions
+
+  # Create a ClusterRole instead of a Role to grant permissions across multiple namespaces
+  - name: Create ClusterRole for GitHub Actions
     kubernetes.core.k8s:
       state: present
       definition:
         apiVersion: rbac.authorization.k8s.io/v1
-        kind: Role
+        kind: ClusterRole
         metadata:
-          name: "{{ github_actions_role_name }}"
-          namespace: "{{ item }}"
+          name: "{{ github_actions_role_name | default('github-actions-role') }}"
           labels:
             app.kubernetes.io/managed-by: ansible
             app.kubernetes.io/part-of: ci-cd
         rules:
-        # Core API resources
         - apiGroups: [""]
           resources: ["pods", "services", "configmaps", "secrets", "serviceaccounts", "persistentvolumeclaims", "events"]
           verbs: ["get", "list", "watch", "create", "update", "delete", "patch"]
-        
-        # Apps API group
         - apiGroups: ["apps"]
           resources: ["deployments", "statefulsets", "daemonsets", "replicasets"]
           verbs: ["get", "list", "watch", "create", "update", "delete", "patch"]
-        
-        # Batch API group
         - apiGroups: ["batch"]
           resources: ["jobs", "cronjobs"]
           verbs: ["get", "list", "watch", "create", "update", "delete", "patch"]
-        
-        # Networking API group (replacing deprecated extensions)
         - apiGroups: ["networking.k8s.io"]
           resources: ["ingresses", "networkpolicies"]
           verbs: ["get", "list", "watch", "create", "update", "delete", "patch"]
-          
-        # StackGres API resources
         - apiGroups: ["stackgres.io"]
-          resources: [
-            "sgclusters", 
-            "sgpoolconfigs", 
-            "sginstanceprofiles", 
-            "sgbackups", 
-            "sgbackupconfigs", 
-            "sgobjectstorages", 
-            "sgshardedclusters",
-            "sgdbops",
-            "sgscripts",
-            "sgpgconfigs"
-          ]
+          resources: ["sgclusters", "sgpoolconfigs", "sginstanceprofiles", "sgbackups", "sgbackupconfigs", "sgobjectstorages", "sgshardedclusters", "sgdbops", "sgscripts", "sgpgconfigs"]
           verbs: ["get", "list", "watch", "create", "update", "delete", "patch"]
-        
-        # Additional permissions for logs and exec
         - apiGroups: [""]
           resources: ["pods/log", "pods/exec"]
           verbs: ["get", "list", "create"]
-    loop: "{{ github_actions_target_namespaces }}"
-  
-  - name: Create RoleBinding to link Service Account with Role
+
+  # Bind the ServiceAccount to the ClusterRole within each target namespace
+  - name: Create RoleBinding for GitHub Actions ServiceAccount in each target namespace
     kubernetes.core.k8s:
       state: present
       definition:
         apiVersion: rbac.authorization.k8s.io/v1
         kind: RoleBinding
         metadata:
-          name: "{{ github_actions_role_name }}-binding"
+          name: "{{ github_actions_role_name | default('github-actions-role') }}-binding"
           namespace: "{{ item }}"
           labels:
             app.kubernetes.io/managed-by: ansible
@@ -83,23 +61,24 @@
         subjects:
         - kind: ServiceAccount
           name: "{{ github_actions_sa_name | default('github-actions') }}"
-          namespace: "{{ item }}"
+          namespace: "{{ github_actions_sa_namespace | default('ci-cd') }}"
         roleRef:
-          kind: Role
-          name: "{{ github_actions_role_name }}"
+          kind: ClusterRole
+          name: "{{ github_actions_role_name | default('github-actions-role') }}"
           apiGroup: rbac.authorization.k8s.io
     loop: "{{ github_actions_target_namespaces }}"
-  
+
+  # Retrieve the ServiceAccount details to find its token
   - name: Get ServiceAccount token secret name
     kubernetes.core.k8s_info:
       api_version: v1
       kind: ServiceAccount
       name: "{{ github_actions_sa_name | default('github-actions') }}"
-      namespace: "{{ github_actions_target_namespaces[0] }}"
+      namespace: "{{ github_actions_sa_namespace | default('ci-cd') }}"
     register: sa_info
-    when: github_actions_target_namespaces | length > 0
-  
-  - name: Create token for ServiceAccount (for K8s v1.24+)
+
+  # Create a token Secret for the ServiceAccount if needed (for Kubernetes v1.24+)
+  - name: Create token for ServiceAccount
     kubernetes.core.k8s:
       state: present
       definition:
@@ -107,12 +86,8 @@
         kind: Secret
         metadata:
           name: "{{ github_actions_sa_name | default('github-actions') }}-token"
-          namespace: "{{ github_actions_target_namespaces[0] }}"
+          namespace: "{{ github_actions_sa_namespace | default('ci-cd') }}"
           annotations:
             kubernetes.io/service-account.name: "{{ github_actions_sa_name | default('github-actions') }}"
         type: kubernetes.io/service-account-token
     register: token_secret
-    when: 
-      - github_actions_target_namespaces | length > 0
-      - sa_info is defined
-      - sa_info.resources is defined
