@@ -8,6 +8,7 @@
   delegate_to: "{{ microk8s_primary }}"
   run_once: true
   when: inventory_hostname in groups['k8s_master']
+  changed_when: false
 
 - name: Enable MicroK8s features
   command: "microk8s enable {{ item }}"

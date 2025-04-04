@@ -2,11 +2,11 @@
 # Worker node specific configuration tasks
 
 - name: Join worker node to cluster
-  command: "{{ join_command.stdout_lines[0] }}"
+  command: "microk8s join {{ join_command.urls[0] }} --worker"
   when:
     - inventory_hostname in groups['k8s_worker']
     - join_command is defined
-    - join_command.stdout_lines[0] is defined
+    - join_command.urls is defined
   
 
 - name: Check node status
