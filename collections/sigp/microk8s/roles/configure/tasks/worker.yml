@@ -1,16 +1,29 @@
 ---
 # Worker node specific configuration tasks
 
+- name: Verify join command structure
+  assert:
+    that:
+      - join_command is defined
+      - join_command.urls is defined
+      - join_command.urls[0] is defined
+    fail_msg: "Join command missing required fields. Run with -vvv to debug."
+    success_msg: "Join command structure verified"
+
+- name: Debug join command details
+  debug:
+    msg: |
+      Join URL: {{ join_command.urls[0] }}
+      Command: microk8s join {{ join_command.urls[0] }} --worker
+  when: inventory_hostname in groups['k8s_worker']
+
 - name: Join worker node to cluster
   command: "microk8s join {{ join_command.urls[0] }} --worker"
   register: join_result
   retries: 3
   delay: 10
   until: join_result.rc == 0
-  when:
-    - inventory_hostname in groups['k8s_worker']
-    - join_command is defined
-    - join_command.urls is defined
+  when: inventory_hostname in groups['k8s_worker']
 
 - name: Debug join result
   debug:
