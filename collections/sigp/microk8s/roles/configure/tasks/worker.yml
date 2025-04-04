@@ -3,10 +3,29 @@
 
 - name: Join worker node to cluster
   command: "microk8s join {{ join_command.urls[0] }} --worker"
+  register: join_result
+  retries: 3
+  delay: 10
+  until: join_result.rc == 0
   when:
     - inventory_hostname in groups['k8s_worker']
     - join_command is defined
     - join_command.urls is defined
+
+- name: Debug join result
+  debug:
+    var: join_result
+    verbosity: 1
+
+- name: Verify node joined successfully
+  command: microk8s kubectl get nodes -o wide
+  register: node_list
+  changed_when: false
+  failed_when: "'{{ inventory_hostname }}' not in node_list.stdout"
+
+- name: Show cluster nodes
+  debug:
+    var: node_list.stdout
   
 
 - name: Check node status
