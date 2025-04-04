@@ -35,7 +35,7 @@
         regexp: '^alias mh='
         state: present
 
-- name: Source the .bashrc file
-  command: "source /home/{{ microk8s_user }}/.bashrc"
-  args:
-    executable: /bin/bash
+# - name: Source the .bashrc file
+#   command: "source /home/{{ microk8s_user }}/.bashrc"
+#   args:
+#     executable: /bin/bash
