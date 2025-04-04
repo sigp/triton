@@ -1,0 +1,16 @@
+---
+- name: Configure MicroK8s cluster
+  hosts: k8s_master:k8s_worker
+  gather_facts: true
+
+  vars:
+    microk8s_addons:
+      - dns
+      - dashboard
+      - storage
+
+  tasks:
+    - name: Configure MicroK8s
+      import_role:
+        name: sigp.microk8s.configure
+      tags: configure

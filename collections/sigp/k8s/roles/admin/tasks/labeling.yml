@@ -28,7 +28,9 @@
     kubeconfig: "{{ kubeconfig | default(omit) }}"
     context: "{{ context | default(omit) }}"
   register: node_info
-  when: node_labeling_enabled
+  when:
+    - node_labeling_enabled
+    - inventory_hostname in groups['k8s_master']
 
 - name: Set fact for current labels
   set_fact:
@@ -52,6 +54,7 @@
   when:
     - node_labeling_enabled
     - standard_labels is defined
+    - inventory_hostname in groups['k8s_master']
   register: standard_label_result
 
 - name: Apply fact-based labels
@@ -79,6 +82,7 @@
   when:
     - node_labeling_enabled
     - enable_fact_labels
+    - inventory_hostname in groups['k8s_master']
   register: fact_label_result
 
 - name: Apply hardware specs labels
@@ -99,6 +103,7 @@
   when:
     - node_labeling_enabled
     - hardware_specs.cpu != "unknown" or hardware_specs.memory != "unknown" or hardware_specs.storage != "unknown"
+    - inventory_hostname in groups['k8s_master']
   register: hw_label_result
 
 - name: Verify labels were applied
@@ -109,7 +114,9 @@
     kubeconfig: "{{ kubeconfig | default(omit) }}"
     context: "{{ context | default(omit) }}"
   register: final_node_info
-  when: node_labeling_enabled
+  when:
+    - node_labeling_enabled
+    - inventory_hostname in groups['k8s_master']
 
 - name: Show labeling results
   debug:
@@ -129,4 +136,6 @@
       metadata:
         labels:
           "K8S_NODE_LABELS_MANAGED_BY": "ansible sigp.k8s"
-  when: node_labeling_enabled
+  when:
+    - node_labeling_enabled
+    - inventory_hostname in groups['k8s_master']
