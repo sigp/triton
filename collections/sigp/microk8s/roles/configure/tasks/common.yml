@@ -9,6 +9,12 @@
   when: inventory_hostname in groups['k8s_master']
   changed_when: false
 
+- name: Debug join command output
+  debug:
+    var: join_command
+    verbosity: 1
+  changed_when: false
+
 - name: Enable MicroK8s features
   command: "microk8s enable {{ item }}"
   become: true
