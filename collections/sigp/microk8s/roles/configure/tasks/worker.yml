@@ -20,6 +20,7 @@
 - name: Verify node joined successfully
   command: microk8s kubectl get nodes -o wide
   register: node_list
+  become: true
   changed_when: false
   failed_when: "'{{ inventory_hostname }}' not in node_list.stdout"
 
