@@ -1,20 +1,28 @@
 ---
 # tasks file for installing dependencies
 
-- name: Ensure Python is installed
-  ansible.builtin.package:
-    name: python
-    state: present
 
-- name: Ensure pip is installed
-  ansible.builtin.package:
-    name: python-pip
-    state: present
+    - name: Install Dependencies
+      become: true
+      apt:
+        name: ['python3-pip']
+        state: latest
+        update_cache: yes
+    # - name: Ensure Python is installed
+    #   ansible.builtin.package:
+    #     name: python
+    #     state: present
 
-- name: Install required Python packages
-  ansible.builtin.pip:
-    name:
-      - openshift>=0.6
-      - PyYAML>=3.11
-      - kubernetes
-    state: present
+    # - name: Ensure pip is installed
+    #   ansible.builtin.package:
+    #     name: python-pip
+    #     state: present
+
+    - name: Install required Python packages
+      ansible.builtin.pip:
+        name:
+          - openshift>=0.6 
+          - PyYAML>=3.11
+          - kubernetes
+        state: present
+        break_system_packages: yes
