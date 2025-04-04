@@ -14,6 +14,7 @@
     mode: '0755'
     owner: root
     group: root
+  become: true
   tags: install
 
 - name: Install Helm
@@ -23,9 +24,11 @@
         url: https://raw.githubusercontent.com/helm/helm/main/scripts/get-helm-3
         dest: /tmp/get_helm.sh
         mode: '0755'
+        
     
     - name: Run Helm installation script
       command: /tmp/get_helm.sh
+      become: true
       args:
         creates: /usr/local/bin/helm
   tags: install
@@ -44,6 +47,7 @@
     name: microk8s
     state: present
     classic: yes
+  become: true
   tags: install
 
 - name: Add user to microk8s group
@@ -51,4 +55,5 @@
     name: "{{ microk8s_user | default(ansible_user) }}"
     groups: microk8s
     append: yes
+  become: true
   tags: install
