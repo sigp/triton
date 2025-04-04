@@ -48,7 +48,12 @@
         regexp: '^alias mh='
         state: present
 
-- name: Source the .bashrc file
-  command: "source /home/{{ microk8s_user }}/.bashrc"
-  args:
-    executable: /bin/bash
+# - name: Source the .bashrc file
+#   command: "source /home/{{ microk8s_user }}/.bashrc"
+#   args:
+#     executable: /bin/bash
+#   when: false
+
+# TODO
+# FAILED! => {"changed": false, "cmd": "source /home/ubuntu/.bashrc", "msg": "[Errno 2] No such file or directory: b'source'", "rc": 2, "stderr": "", "stderr_lines": [], "stdout": "", "stdout_lines": []}
+    
