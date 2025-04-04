@@ -1,70 +1,14 @@
 ---
-# tasks file for sigp.microk8s.configure
-
-- name: Enable MicroK8s features
-  command: "microk8s enable {{ item }}"
-  become: true
-  loop: "{{ microk8s_features }}"
-  register: enable_features
-  changed_when: "'is already enabled' not in enable_features.stdout"
+- name: Include common configuration tasks
+  include_tasks: common.yml
   tags: configure
 
-- name: Configure git safe directory (workaround for known issue)
-  command: git config --global --add safe.directory /snap/microk8s/current/addons/community/.git
+- name: Include master node tasks
+  include_tasks: master.yml
+  when: inventory_hostname in groups['k8s_master']
   tags: configure
 
-- name: Create bash aliases for MicroK8s
-  block:
-    - name: Ensure .bash_aliases exists
-      file:
-        path: "/home/{{ microk8s_user }}/.bash_aliases"
-        state: touch
-        owner: "{{ microk8s_user }}"
-        group: "{{ microk8s_user }}"
-
-    - name: Add microk8s kubectl alias
-      lineinfile:
-        path: "/home/{{ microk8s_user }}/.bash_aliases"
-        line: "alias mk='microk8s kubectl'"
-        regexp: '^alias mk='
-        state: present
-
-    - name: Add microk8s helm alias
-      lineinfile:
-        path: "/home/{{ microk8s_user }}/.bash_aliases"
-        line: "alias mh='microk8s helm'"
-        regexp: '^alias mh='
-        state: present
+- name: Include worker node tasks
+  include_tasks: worker.yml
+  when: inventory_hostname in groups['k8s_worker']
   tags: configure
-
-- name: Source the .bashrc file
-  command: "source /home/{{ microk8s_user }}/.bashrc"
-  args:
-    executable: /bin/bash
-  tags: configure
-
-- name: Add worker nodes to cluster
-  block:
-    - name: Generate join command on primary node
-      command: microk8s add-node
-      register: join_command
-      delegate_to: "{{ microk8s_primary }}"
-      run_once: true
-
-    - name: Join worker node to cluster
-      command: "{{ join_command.stdout_lines[0] }}"
-      when: inventory_hostname in microk8s_workers
-  tags: node_management
-
-- name: Remove node from cluster
-  command: "microk8s remove-node {{ item }}"
-  become: true
-  loop: "{{ microk8s_nodes_to_remove }}"
-  when: microk8s_nodes_to_remove is defined
-  tags: node_management
-
-- name: Check node status
-  command: microk8s kubectl get nodes
-  register: node_status
-  changed_when: false
-  tags: node_management
