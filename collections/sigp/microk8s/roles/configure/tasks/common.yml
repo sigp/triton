@@ -1,5 +1,4 @@
 ---
----
 # Common configuration tasks for all MicroK8s nodes
 
 - name: Generate join command on primary node
