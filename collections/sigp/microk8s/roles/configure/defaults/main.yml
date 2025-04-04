@@ -9,8 +9,9 @@ microk8s_features:
   - community
 
 # Node management
-microk8s_primary: "{{ groups['microk8s_primary'] | first }}"
-microk8s_workers: "{{ groups['microk8s_workers'] | default([]) }}"
+microk8s_primary: "{{ groups['k8s_master'] | first }}"
+microk8s_workers: "{{ groups['k8s_worker'] | default([]) }}"
+microk8s_worker_flag: "--worker"
 
 # Storage configuration
 microk8s_storage_size: 40Gi
