@@ -1,5 +1,13 @@
 ---
+---
 # Common configuration tasks for all MicroK8s nodes
+
+- name: Generate join command on primary node
+  command: microk8s add-node
+  register: join_command
+  delegate_to: "{{ microk8s_primary }}"
+  run_once: true
+  when: inventory_hostname in groups['k8s_master']
 
 - name: Enable MicroK8s features
   command: "microk8s enable {{ item }}"
@@ -7,7 +15,6 @@
   loop: "{{ microk8s_features }}"
   register: enable_features
   changed_when: "'is already enabled' not in enable_features.stdout"
-  when: inventory_hostname in groups['k8s_master']
 
 - name: Configure git safe directory (workaround for known issue)
   command: git config --global --add safe.directory /snap/microk8s/current/addons/community/.git
@@ -35,7 +42,7 @@
         regexp: '^alias mh='
         state: present
 
-# - name: Source the .bashrc file
-#   command: "source /home/{{ microk8s_user }}/.bashrc"
-#   args:
-#     executable: /bin/bash
+- name: Source the .bashrc file
+  command: "source /home/{{ microk8s_user }}/.bashrc"
+  args:
+    executable: /bin/bash

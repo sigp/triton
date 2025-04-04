@@ -1,12 +1,6 @@
 ---
 # Master node specific configuration tasks
 
-- name: Generate join command on primary node
-  command: microk8s add-node
-  register: join_command
-  delegate_to: "{{ microk8s_primary }}"
-  run_once: true
-
 - name: Remove node from cluster
   command: "microk8s remove-node {{ item }}"
   become: true
