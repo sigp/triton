@@ -121,7 +121,10 @@
 - name: Show labeling results
   debug:
     msg: "Node {{ inventory_hostname }} now has {{ final_node_info.resources[0].metadata.labels | length }} labels"
-  when: node_labeling_enabled
+  when: 
+    - node_labeling_enabled
+    - inventory_hostname in groups['k8s_master']
+    - final_node_info.resources[0].metadata.labels | length > 0
 
 - name: Set environment variable for managed labels
   community.kubernetes.k8s:
