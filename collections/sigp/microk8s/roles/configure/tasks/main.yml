@@ -1,4 +1,26 @@
 ---
+- name: Include common configuration
+  include_tasks: common.yml
+  tags: always
+
+- name: Verify join_command is available
+  assert:
+    that:
+      - join_command is defined
+    fail_msg: "join_command not available. Check common.yml tasks."
+  
+- name: Debug join_command availability
+  debug:
+    var: join_command
+    verbosity: 1
+
+- name: Include master configuration
+  include_tasks: master.yml
+  when: inventory_hostname in groups['k8s_master']
+
+- name: Include worker configuration
+  include_tasks: worker.yml
+  when: inventory_hostname in groups['k8s_worker']
 # tasks file for sigp.microk8s.configure
 
 - name: Include common configuration tasks

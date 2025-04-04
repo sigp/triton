@@ -8,11 +8,26 @@
   run_once: true
   when: inventory_hostname in groups['k8s_master']
   changed_when: false
+  ignore_errors: true
+
+- name: Debug raw join command output
+  debug:
+    var: join_command_raw
+  when: inventory_hostname in groups['k8s_master']
 
 - name: Parse join command output
   set_fact:
     join_command: "{{ join_command_raw.stdout | from_yaml }}"
-  when: join_command_raw.stdout is defined
+  when:
+    - inventory_hostname in groups['k8s_master']
+    - join_command_raw.stdout is defined
+
+- name: Verify join command was created
+  assert:
+    that:
+      - join_command is defined
+    fail_msg: "Failed to generate join command. Raw output: {{ join_command_raw }}"
+    success_msg: "Join command successfully generated"
 
 - name: Debug full join command structure
   debug:
