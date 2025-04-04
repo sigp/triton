@@ -1,0 +1,26 @@
+---
+- name: Configure GitHub Actions Kubernetes Access
+  hosts: all
+  gather_facts: false
+  vars:
+    github_actions_sa_name: "github-actions"
+    github_actions_sa_namespace: "ci-cd"
+    github_actions_role_name: "github-actions-role"
+    github_actions_target_namespaces:
+      - "default"
+      - "lynx"
+      - "rbuilder"
+      - "stackgres"
+
+  environment:
+    K8S_AUTH_KUBECONFIG: /var/snap/microk8s/current/credentials/client.config
+    KUBECONFIG: /var/snap/microk8s/current/credentials/kubelet.config
+  tasks:
+    - name: Include GitHub Actions role
+      include_role:
+        name: collections/sigp/k8s/roles/github-actions
+
+    - name: Display Service Account token secret
+      debug:
+        msg: "Token secret created: {{ token_secret.result.metadata.name }}"
+      when: token_secret is defined

@@ -115,3 +115,18 @@
   debug:
     msg: "Node {{ inventory_hostname }} now has {{ final_node_info.resources[0].metadata.labels | length }} labels"
   when: node_labeling_enabled
+
+- name: Set environment variable for managed labels
+  community.kubernetes.k8s:
+    api_version: v1
+    kind: Node
+    name: "{{ inventory_hostname }}"
+    state: present
+    merge_type: strategic-merge
+    kubeconfig: "{{ kubeconfig | default(omit) }}"
+    context: "{{ context | default(omit) }}"
+    definition:
+      metadata:
+        labels:
+          "K8S_NODE_LABELS_MANAGED_BY": "ansible sigp.k8s"
+  when: node_labeling_enabled

@@ -4,10 +4,12 @@
 # Namespace configuration
 github_actions_namespace: github-actions
 github_actions_service_account: github-actions-sa
+## Create namespaces if they do not exist
+github_actions_create_namespaces: true
 
 # Role configuration
-github_actions_role_name: pod-reader
-github_actions_role_binding_name: github-actions-pod-reader
+github_actions_role_name: github-actions-role
+github_actions_role_binding_name: github-actions-role-binding
 
 # Target namespaces for RoleBindings
 github_actions_target_namespaces:
