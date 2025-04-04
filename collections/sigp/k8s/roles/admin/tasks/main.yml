@@ -6,6 +6,8 @@
     path: /etc/environment
     line: 'HELLO_WORLD="hello world"'
     create: yes
+  become: true
+  
 
 - name: Debug message
   ansible.builtin.debug:
@@ -13,6 +15,12 @@
 
 - name: Include dependencies tasks
   include_tasks: dependencies.yml
+
+
+
+- name: Debug node_labeling_enabled value
+  ansible.builtin.debug:
+    var: node_labeling_enabled
 
 - name: run labeling
   include_tasks: labeling.yml
