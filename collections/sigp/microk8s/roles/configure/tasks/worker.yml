@@ -3,7 +3,7 @@
 
 - name: Join worker node to cluster
   command: "{{ join_command.stdout_lines[0] }}"
-  when: inventory_hostname in microk8s_workers
+  when: inventory_hostname in k8s_worker
 
 - name: Check node status
   command: microk8s kubectl get nodes
