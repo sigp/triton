@@ -145,5 +145,9 @@
         Add these secrets to GitHub Actions:
         
         KUBE_HOST: "https://kubernetes.default.svc"
-        KUBE_CERTIFICATE: "{{ cluster_ca.resources[0].data['ca.crt'] }}"
-        KUBE_TOKEN: "{{ sa_token.resources[0].data.token | b64decode }}"
+        
+        KUBE_CERTIFICATE: |
+          {{ cluster_ca.resources[0].data['ca.crt'] }}
+        
+        KUBE_TOKEN: |
+          {{ sa_token.resources[0].data.token | b64decode }}
