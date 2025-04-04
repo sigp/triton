@@ -20,6 +20,7 @@
   become: true
   loop: "{{ microk8s_features }}"
   register: enable_features
+  when: inventory_hostname in groups['k8s_master']
   changed_when: "'is already enabled' not in enable_features.stdout"
 
 - name: Configure git safe directory (workaround for known issue)
