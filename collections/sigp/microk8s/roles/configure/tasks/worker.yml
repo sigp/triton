@@ -1,20 +1,38 @@
 ---
 # Worker node specific configuration tasks
 
-- name: Verify join command structure
+- name: Debug full join command structure
+  debug:
+    var: join_command
+    verbosity: 2
+
+- name: Verify join command has required fields
   assert:
     that:
       - join_command is defined
+      - "'urls' in join_command"
       - join_command.urls is defined
       - join_command.urls[0] is defined
-    fail_msg: "Join command missing required fields. Run with -vvv to debug."
-    success_msg: "Join command structure verified"
+      - "'token' in join_command"
+      - join_command.token is defined
+      - "'port' in join_command"
+      - join_command.port is defined
+    fail_msg: |
+      Missing required join command fields.
+      Defined fields: {{ join_command.keys() if join_command is defined else 'UNDEFINED' }}
+      URLs present: {{ join_command.urls is defined }}
+      Token present: {{ 'token' in join_command if join_command is defined else False }}
+      Port present: {{ 'port' in join_command if join_command is defined else False }}
+    success_msg: "All required join command fields present"
 
-- name: Debug join command details
+- name: Debug each join command component
   debug:
     msg: |
-      Join URL: {{ join_command.urls[0] }}
-      Command: microk8s join {{ join_command.urls[0] }} --worker
+      Join command structure:
+      - URLs: {{ join_command.urls if join_command.urls is defined else 'MISSING' }}
+      - First URL: {{ join_command.urls[0] if join_command.urls is defined and join_command.urls[0] is defined else 'MISSING' }}
+      - Token: {{ join_command.token if join_command.token is defined else 'MISSING' }}
+      - Port: {{ join_command.port if join_command.port is defined else 'MISSING' }}
   when: inventory_hostname in groups['k8s_worker']
 
 - name: Join worker node to cluster
