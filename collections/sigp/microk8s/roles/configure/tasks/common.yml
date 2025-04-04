@@ -1,0 +1,40 @@
+---
+# Common configuration tasks for all MicroK8s nodes
+
+- name: Enable MicroK8s features
+  command: "microk8s enable {{ item }}"
+  become: true
+  loop: "{{ microk8s_features }}"
+  register: enable_features
+  changed_when: "'is already enabled' not in enable_features.stdout"
+
+- name: Configure git safe directory (workaround for known issue)
+  command: git config --global --add safe.directory /snap/microk8s/current/addons/community/.git
+
+- name: Create bash aliases for MicroK8s
+  block:
+    - name: Ensure .bash_aliases exists
+      file:
+        path: "/home/{{ microk8s_user }}/.bash_aliases"
+        state: touch
+        owner: "{{ microk8s_user }}"
+        group: "{{ microk8s_user }}"
+
+    - name: Add microk8s kubectl alias
+      lineinfile:
+        path: "/home/{{ microk8s_user }}/.bash_aliases"
+        line: "alias mk='microk8s kubectl'"
+        regexp: '^alias mk='
+        state: present
+
+    - name: Add microk8s helm alias
+      lineinfile:
+        path: "/home/{{ microk8s_user }}/.bash_aliases"
+        line: "alias mh='microk8s helm'"
+        regexp: '^alias mh='
+        state: present
+
+- name: Source the .bashrc file
+  command: "source /home/{{ microk8s_user }}/.bashrc"
+  args:
+    executable: /bin/bash

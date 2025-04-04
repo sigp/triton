@@ -1,4 +1,6 @@
 ---
+# tasks file for sigp.microk8s.configure
+
 - name: Include common configuration tasks
   include_tasks: common.yml
   tags: configure
@@ -6,9 +8,9 @@
 - name: Include master node tasks
   include_tasks: master.yml
   when: inventory_hostname in groups['k8s_master']
-  tags: configure
+  tags: node_management
 
 - name: Include worker node tasks
   include_tasks: worker.yml
   when: inventory_hostname in groups['k8s_worker']
-  tags: configure
+  tags: node_management
