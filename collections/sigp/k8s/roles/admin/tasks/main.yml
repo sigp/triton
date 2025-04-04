@@ -1,0 +1,19 @@
+---
+# tasks file for admin role
+
+- name: Add environment variable
+  ansible.builtin.lineinfile:
+    path: /etc/environment
+    line: 'HELLO_WORLD="hello world"'
+    create: yes
+
+- name: Debug message
+  ansible.builtin.debug:
+    msg: 'sigp.k8s labelling role is running'
+
+- name: Include dependencies tasks
+  include_tasks: dependencies.yml
+
+- name: run labeling
+  include_tasks: labeling.yml
+  when: node_labeling_enabled | default(false)
