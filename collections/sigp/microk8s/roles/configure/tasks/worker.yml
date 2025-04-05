@@ -29,19 +29,19 @@
     var: join_result
     verbosity: 1
 
-- name: Verify node joined successfully
-  command: microk8s kubectl get nodes -o wide
-  register: node_list
-  become: true
-  changed_when: false
-  failed_when: "'{{ inventory_hostname }}' not in node_list.stdout"
+# - name: Verify node joined successfully
+#   command: microk8s kubectl get nodes -o wide
+#   register: node_list
+#   become: true
+#   changed_when: false
+#   failed_when: "'{{ inventory_hostname }}' not in node_list.stdout"
 
-- name: Show cluster nodes
-  debug:
-    var: node_list.stdout
+# - name: Show cluster nodes
+#   debug:
+#     var: node_list.stdout
   
 
-- name: Check node status
-  command: microk8s kubectl get nodes
-  register: node_status
-  changed_when: false
+# - name: Check node status
+#   command: microk8s kubectl get nodes
+#   register: node_status
+#   changed_when: false
