@@ -1,0 +1,57 @@
+---
+# Sequential node joining tasks for MicroK8s clusters
+# This ensures each node gets a fresh join token
+
+- name: Verify k8s_master group exists
+  assert:
+    that:
+      - groups['k8s_master'] is defined
+    fail_msg: "No k8s_master group defined in inventory"
+    success_msg: "k8s_master group exists"
+
+- name: Get list of worker nodes to join
+  set_fact:
+    workers_to_join: "{{ groups['k8s_worker'] | difference([inventory_hostname]) }}"
+  when: inventory_hostname in groups['k8s_worker']
+
+- name: Process worker nodes sequentially
+  block:
+    - name: Generate fresh join command for {{ worker_host }}
+      command: microk8s add-node --format yaml
+      register: join_command
+      delegate_to: "{{ microk8s_primary }}"
+      changed_when: false
+      loop: "{{ workers_to_join }}"
+      loop_control:
+        loop_var: worker_host
+        label: "Generating for {{ worker_host }}"
+
+    - name: Join worker node {{ worker_host }} to cluster
+      command: >
+        microk8s join 
+        {{ join_command.results[ansible_loop.index0].stdout | from_yaml | json_query('ip') }}:
+        {{ join_command.results[ansible_loop.index0].stdout | from_yaml | json_query('port') }}/
+        {{ join_command.results[ansible_loop.index0].stdout | from_yaml | json_query('token') }}/
+        {{ join_command.results[ansible_loop.index0].stdout | from_yaml | json_query('hash') }}
+        --worker
+      register: join_result
+      delegate_to: "{{ worker_host }}"
+      retries: 3
+      delay: 10
+      until: join_result.rc == 0
+      loop: "{{ workers_to_join }}"
+      loop_control:
+        loop_var: worker_host
+        index_var: ansible_loop
+
+    - name: Verify {{ worker_host }} joined successfully
+      command: microk8s kubectl get nodes -o wide
+      register: node_list
+      delegate_to: "{{ microk8s_primary }}"
+      changed_when: false
+      failed_when: "'{{ worker_host }}' not in node_list.stdout"
+      loop: "{{ workers_to_join }}"
+      loop_control:
+        loop_var: worker_host
+
+  when: inventory_hostname in groups['k8s_worker']

@@ -42,5 +42,14 @@
 
 - name: Include worker node tasks
   include_tasks: worker.yml
-  when: inventory_hostname in groups['k8s_worker']
+  when:
+    - inventory_hostname in groups['k8s_worker']
+    - not microk8s_sequential_join | default(false)
+  tags: node_management
+
+- name: Include sequential worker join tasks
+  include_tasks: sequential_join.yml
+  when:
+    - inventory_hostname in groups['k8s_worker']
+    - microk8s_sequential_join | default(false)
   tags: node_management
