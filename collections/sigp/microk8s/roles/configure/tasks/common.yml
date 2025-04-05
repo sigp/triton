@@ -8,36 +8,36 @@
     fail_msg: "No k8s_master group defined in inventory"
     success_msg: "k8s_master group exists"
 
-- name: Generate join command on primary node
+- name: Initialize join_commands dictionary
+  set_fact:
+    join_commands: {}
+
+- name: Generate unique join command for each worker
   command: microk8s add-node --format yaml
   register: join_command_raw
   delegate_to: "{{ microk8s_primary }}"
-  run_once: true
   changed_when: false
   ignore_errors: true
+  when: inventory_hostname in groups['k8s_worker']
+  loop: "{{ groups['k8s_worker'] }}"
+  loop_control:
+    loop_var: worker_host
+    label: "Generating for {{ worker_host }}"
 
-- name: Debug inventory and primary node
-  debug:
-    msg: |
-      Inventory groups: {{ groups.keys() }}
-      Primary node: {{ microk8s_primary }}
-      Current host: {{ inventory_hostname }}
-
-- name: Parse join command output
+- name: Store worker join commands
   set_fact:
-    join_command: "{{ join_command_raw.stdout | from_yaml }}"
-  when: join_command_raw.stdout is defined
+    join_commands: "{{ join_commands | combine({worker_host: join_command_raw.results[ansible_loop.index0].stdout | from_yaml}) }}"
+  when:
+    - join_command_raw.results[ansible_loop.index0].stdout is defined
+    - inventory_hostname in groups['k8s_worker']
+  loop: "{{ groups['k8s_worker'] }}"
+  loop_control:
+    loop_var: worker_host
+    index_var: ansible_loop
 
-- name: Verify join command was created
-  assert:
-    that:
-      - join_command is defined
-    fail_msg: |
-      Failed to generate join command. Possible issues:
-      - microk8s not installed on primary node
-      - Primary node not reachable
-      - Raw output: {{ join_command_raw }}
-    success_msg: "Join command successfully generated"
+- name: Debug join commands
+  debug:
+    var: join_commands
 
 - name: Debug full join command structure
   debug:

@@ -10,13 +10,19 @@
 
 
 
-- name: Join worker node to cluster
-  command: "microk8s join {{ join_command.urls[0] }} --worker"
+- name: Join worker node to cluster with unique token
+  command: >
+    microk8s join
+    {{ join_commands[inventory_hostname].ip }}:{{ join_commands[inventory_hostname].port }}/
+    {{ join_commands[inventory_hostname].token }}/{{ join_commands[inventory_hostname].hash }}
+    --worker
   register: join_result
   retries: 3
   delay: 10
   until: join_result.rc == 0
-  when: inventory_hostname in groups['k8s_worker']
+  when:
+    - inventory_hostname in groups['k8s_worker']
+    - join_commands[inventory_hostname] is defined
 
 - name: Debug join result
   debug:
