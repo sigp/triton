@@ -1,32 +1,42 @@
 ---
 # Common configuration tasks for all MicroK8s nodes
 
+- name: Verify k8s_master group exists
+  assert:
+    that:
+      - groups['k8s_master'] is defined
+    fail_msg: "No k8s_master group defined in inventory"
+    success_msg: "k8s_master group exists"
+
 - name: Generate join command on primary node
   command: microk8s add-node --format yaml
   register: join_command_raw
   delegate_to: "{{ microk8s_primary }}"
   run_once: true
-  when: inventory_hostname in groups['k8s_master']
   changed_when: false
   ignore_errors: true
 
-- name: Debug raw join command output
+- name: Debug inventory and primary node
   debug:
-    var: join_command_raw
-  when: inventory_hostname in groups['k8s_master']
+    msg: |
+      Inventory groups: {{ groups.keys() }}
+      Primary node: {{ microk8s_primary }}
+      Current host: {{ inventory_hostname }}
 
 - name: Parse join command output
   set_fact:
     join_command: "{{ join_command_raw.stdout | from_yaml }}"
-  when:
-    - inventory_hostname in groups['k8s_master']
-    - join_command_raw.stdout is defined
+  when: join_command_raw.stdout is defined
 
 - name: Verify join command was created
   assert:
     that:
       - join_command is defined
-    fail_msg: "Failed to generate join command. Raw output: {{ join_command_raw }}"
+    fail_msg: |
+      Failed to generate join command. Possible issues:
+      - microk8s not installed on primary node
+      - Primary node not reachable
+      - Raw output: {{ join_command_raw }}
     success_msg: "Join command successfully generated"
 
 - name: Debug full join command structure
