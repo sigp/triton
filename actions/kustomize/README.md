@@ -1,37 +1,41 @@
-# Kustomize Build Action
+# Kubernetes Kustomize Deployment Action
 
-A composite GitHub Action that wraps the [kustomize-github-action](https://github.com/marketplace/actions/kustomize-github-action) with standardized configuration.
+A composite GitHub Action for deploying applications using Kustomize with Helm support.
 
 ## Inputs
 
 | Parameter | Required | Default | Description |
 |-----------|----------|---------|-------------|
-| `kustomize_version` | No | `3.0.0` | The Kustomize version to use |
-| `kustomize_build_dir` | No | `.` | Directory containing kustomization.yaml |
-| `kustomize_comment` | No | `false` | Whether to comment on GitHub PRs |
-| `kustomize_output_file` | No | - | Path to write build output |
-| `kustomize_build_options` | No | - | Additional build options |
-| `enable_alpha_plugins` | No | `false` | Enable alpha plugins |
-| `working_directory` | No | - | Directory to run command from |
-
-## Outputs
-
-| Parameter | Description |
-|-----------|-------------|
-| `kustomize_build_output` | The output from kustomize build |
+| `environment` | Yes | - | Deployment environment (dev/prod) |
+| `app` | Yes | - | Application name to deploy |
+| `protocol` | No | `https` | Preferred connection protocol (https/http) |
+| `skip_tls_verify` | No | `false` | Skip TLS verification (true/false) |
 
 ## Example Usage
 
 ```yaml
-- name: Run Kustomize Build
-  uses: ./actions/kustomize
+- name: Deploy with Kustomize+Helm
+  uses: sigp/triton/actions/kustomize@main
   with:
-    kustomize_version: '3.0.0'
-    kustomize_build_dir: 'overlays/production'
-    kustomize_output_file: 'rendered.yaml'
-    enable_alpha_plugins: true
+    environment: 'prod'
+    app: 'lynx'
+    protocol: 'https'
+    skip_tls_verify: 'false'
+  env:
+    KUBE_HOST: ${{ secrets.KUBE_HOST }}
+    KUBE_CERTIFICATE: ${{ secrets.KUBE_CERTIFICATE }}
+    KUBE_TOKEN: ${{ secrets.KUBE_TOKEN }}
 ```
 
 ## Notes
 
-This action wraps the [karancode/kustomize-github-action](https://github.com/karancode/kustomize-github-action) to provide consistent version management and configuration across projects.
+This action performs the following steps:
+1. Configures kubectl with the provided credentials
+2. Validates Kustomize manifests with Helm support
+3. Deploys the application using `kubectl apply`
+4. Verifies the deployment status
+
+Required environment secrets:
+- `KUBE_HOST`: Kubernetes API server host
+- `KUBE_CERTIFICATE`: Base64 encoded cluster CA certificate
+- `KUBE_TOKEN`: Service account token for authentication
