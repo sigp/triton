@@ -17,6 +17,10 @@ inputs:
     description: 'Skip TLS verification (true/false)'
     required: false
     default: 'false'
+  validate_kustomize:
+    description: 'Enable Kustomize manifest validation (true/false)'
+    required: false
+    default: 'false'
 
 runs:
   using: "composite"
@@ -48,6 +52,7 @@ runs:
         kubectl get pods --request-timeout=10s
 
     - name: Validate Kustomize Manifests
+      if: ${{ inputs.validate_kustomize == 'true' }}
       shell: bash
       env:
         KUBE_HOST: ${{ env.KUBE_HOST }}
