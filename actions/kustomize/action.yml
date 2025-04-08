@@ -81,4 +81,4 @@ runs:
         KUBE_TOKEN: ${{ env.KUBE_TOKEN }}
       run: |
         echo "Current deployment state:"
-        kubectl get all -n ${{ inputs.app }} --show-labels
+        kubectl get pods -n ${{ inputs.app }} --show-labels
