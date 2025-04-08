@@ -45,7 +45,7 @@ runs:
         kubectl config use-context k8s-context
         
         echo "Verifying cluster connection..."
-        kubectl get nodes --request-timeout=10s
+        kubectl get pods --request-timeout=10s
 
     - name: Validate Kustomize Manifests
       shell: bash
@@ -81,4 +81,4 @@ runs:
         KUBE_TOKEN: ${{ env.KUBE_TOKEN }}
       run: |
         echo "Current deployment state:"
-        kubectl get all -n ${{ inputs.app }} --show-labels
+        kubectl get pods -n ${{ inputs.app }} --show-labels
