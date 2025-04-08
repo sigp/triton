@@ -28,7 +28,12 @@ runs:
 
     - name: Configure Kubectl
       shell: bash
+      env:
+        KUBE_HOST: ${{ env.KUBE_HOST }}
+        KUBE_CERTIFICATE: ${{ env.KUBE_CERTIFICATE }}
+        KUBE_TOKEN: ${{ env.KUBE_TOKEN }}
       run: |
+        set -euo pipefail
         mkdir -p ~/.kube
         echo "${{ env.KUBE_CERTIFICATE }}" | base64 --decode > ca.crt
         kubectl config set-cluster k8s-cluster \
@@ -41,19 +46,42 @@ runs:
           --cluster=k8s-cluster \
           --user=k8s-user
         kubectl config use-context k8s-context
-
-    - name: Deploy with Kustomize+Helm
-      shell: bash
-      run: |
-        if [[ "${{ inputs.environment }}" == "prod" ]]; then
-          KUSTOMIZE_PATH="./k8s/kustomize/${{ inputs.app }}/overlays/prod"
-        else
-          KUSTOMIZE_PATH="./k8s/kustomize/${{ inputs.app }}/overlays/dev"
-        fi
         
-        echo "Deploying from $KUSTOMIZE_PATH"
-        kubectl kustomize --enable-helm "$KUSTOMIZE_PATH" | kubectl apply -f - --validate=${{ !inputs.skip_tls_verify }}
+        echo "Verifying cluster connection..."
+        kubectl get nodes --request-timeout=10s
+
+    - name: Validate Kustomize Manifests
+      shell: bash
       env:
         KUBE_HOST: ${{ env.KUBE_HOST }}
         KUBE_CERTIFICATE: ${{ env.KUBE_CERTIFICATE }}
         KUBE_TOKEN: ${{ env.KUBE_TOKEN }}
+      run: |
+        KUSTOMIZE_PATH="./k8s/kustomize/${{ inputs.app }}/overlays/${{ inputs.environment }}"
+        echo "Validating manifests in $KUSTOMIZE_PATH"
+        kubectl kustomize --enable-helm "$KUSTOMIZE_PATH" --dry-run=server
+
+    - name: Deploy with Kustomize+Helm
+      shell: bash
+      env:
+        KUBE_HOST: ${{ env.KUBE_HOST }}
+        KUBE_CERTIFICATE: ${{ env.KUBE_CERTIFICATE }}
+        KUBE_TOKEN: ${{ env.KUBE_TOKEN }}
+      run: |
+        KUSTOMIZE_PATH="./k8s/kustomize/${{ inputs.app }}/overlays/${{ inputs.environment }}"
+        echo "Deploying from $KUSTOMIZE_PATH"
+        kubectl kustomize --enable-helm "$KUSTOMIZE_PATH" | \
+          kubectl apply -f - \
+            --validate=${{ !inputs.skip_tls_verify }} \
+            --timeout=120s \
+            -o json | jq -r '"Deployed: " + (.items[].metadata.name | @text)'
+
+    - name: Verify Deployment Status
+      shell: bash
+      env:
+        KUBE_HOST: ${{ env.KUBE_HOST }}
+        KUBE_CERTIFICATE: ${{ env.KUBE_CERTIFICATE }}
+        KUBE_TOKEN: ${{ env.KUBE_TOKEN }}
+      run: |
+        echo "Current deployment state:"
+        kubectl get all -n ${{ inputs.app }} --show-labels
