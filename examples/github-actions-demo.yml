@@ -8,9 +8,11 @@
     github_actions_role_name: "github-actions-role"
     github_actions_target_namespaces:
       - "default"
+      - "reth"
       - "lynx"
       - "rbuilder"
       - "stackgres"
+      - "biddata"
 
   environment:
     K8S_AUTH_KUBECONFIG: /var/snap/microk8s/current/credentials/client.config
