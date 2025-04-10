@@ -1,6 +1,6 @@
 ---
 - name: Configure GitHub Actions Kubernetes Access
-  hosts: all
+  hosts: k8s_master[0]
   gather_facts: false
   vars:
     github_actions_sa_name: "github-actions"
