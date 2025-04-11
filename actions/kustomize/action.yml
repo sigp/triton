@@ -9,6 +9,9 @@ inputs:
   app:
     description: 'Application name to deploy'
     required: true
+  namespace:
+    description: 'Kubernetes namespace to deploy into'
+    required: true
   protocol:
     description: 'Preferred connection protocol (https/http)'
     required: false
@@ -73,7 +76,7 @@ runs:
         KUSTOMIZE_PATH="./k8s/kustomize/${{ inputs.app }}/overlays/${{ inputs.environment }}"
         echo "Deploying from $KUSTOMIZE_PATH"
         kubectl kustomize --enable-helm "$KUSTOMIZE_PATH" | \
-          kubectl apply -f -
+          kubectl apply -n ${{ inputs.namespace }} -f -
 
     - name: Verify Deployment Status
       shell: bash
