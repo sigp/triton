@@ -1,4 +1,13 @@
 ---
+
+- name: Enable MicroK8s features
+  command: "microk8s enable {{ item }}"
+  become: true
+  loop: "{{ microk8s_features }}"
+  register: enable_features
+  when: inventory_hostname in groups['k8s_master']
+  changed_when: "'is already enabled' not in enable_features.stdout"
+  
 - name: Join master node to cluster
   block:
     - name: Generate fresh join token
