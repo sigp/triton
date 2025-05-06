@@ -84,9 +84,7 @@
             delay: 5
             until: label_result is not failed
             ignore_errors: "{{ ansible_check_mode }}"
-      
-
-          
+               
 
   - name: Verify cluster state
     hosts: k8s_master[0]
@@ -99,4 +97,34 @@
       - name: Display final cluster state
         debug:
           msg: "{{ final_nodes.stdout_lines }}"
+
+  - name: Enable DNS
+    hosts: k8s_worker
+    gather_facts: no
+    serial: 1
+    tasks:
+      - name: Get cluster DNS IP
+        shell: |
+          awk '/^nameserver/ {print $2}' $(snap run --shell microk8s -c '$SNAP/scripts/find-resolv-conf.py')
+        register: cluster_dns_ip
+        changed_when: false
+
+      - name: Enable MicroK8s DNS
+        command: "microk8s enable {{ item }}"
+        become: yes
+        delegate_to: "{{hostvars[groups['k8s_master'][0]].ansible_ssh_host}}"
+        loop:
+          - "dns:{{ cluster_dns_ip.stdout }}"
+  
+      - name: Configure MicroK8s kubelet args
+        lineinfile:
+          path: /var/snap/microk8s/current/args/kubelet
+          regexp: '^--cluster-dns='
+          line: "--cluster-dns={{ cluster_dns_ip.stdout }}"
+          state: present
+          backup: yes
+        notify: restart microk8s
+  
+      - name: restart microk8s
+        ansible.builtin.reboot:
 
