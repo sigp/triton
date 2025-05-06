@@ -1,0 +1,6 @@
+---
+# handlers file for configure
+  - name: restart ntp
+    ansible.builtin.service:
+      name: ntp
+      state: restarted
