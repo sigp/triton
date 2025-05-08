@@ -15,13 +15,28 @@
   command: git config --global --add safe.directory /snap/microk8s/current/addons/community/.git
 
 - name: Create bash aliases for MicroK8s
+  become: true
   block:
-    - name: Ensure .bash_aliases exists
+    - name: Ensure .bash_aliases exists with proper permissions
+      become: true
       file:
-        path: "/home/{{ microk8s_user }}/.bash_aliases"
+        path: "{{ ansible_user_dir | default('/home/' + microk8s_user) }}/.bash_aliases"
         state: touch
         owner: "{{ microk8s_user }}"
         group: "{{ microk8s_user }}"
+        mode: '0644'
+      register: bash_aliases_result
+      changed_when: bash_aliases_result.changed
+      failed_when: false  # Continue even if file exists with wrong permissions
+      
+    - name: Fix permissions if needed
+      become: true
+      file:
+        path: "{{ ansible_user_dir | default('/home/' + microk8s_user) }}/.bash_aliases"
+        owner: "{{ microk8s_user }}"
+        group: "{{ microk8s_user }}"
+        mode: '0644'
+      when: not bash_aliases_result.changed
 
     - name: Add microk8s kubectl alias
       lineinfile:
