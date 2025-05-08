@@ -22,3 +22,5 @@ microk8s_user: "{{ ansible_user }}"
 # Additional configuration options
 microk8s_enable_argocd: false
 microk8s_enable_linkerd: false
+
+microk8s_dns_hack: false
