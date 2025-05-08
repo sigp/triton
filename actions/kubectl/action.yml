@@ -1,52 +1,52 @@
-name: 'Kubectl Command'
-description: 'Execute kubectl commands with pre-configured authentication'
+name: 'Kubernetes Deployment'
+description: 'Deploy applications to Kubernetes using Kustomize with environment-specific configuration'
 author: 'Sigmaprime'
 
 inputs:
-  working_directory:
-    description: 'Directory to run command from'
-    required: false
-    default: ''
-  command:
-    description: 'Main kubectl command (apply, delete, get, etc.)'
+  environment:
+    description: 'Deployment environment (dev/prod)'
     required: true
-  args:
-    description: 'Additional command arguments'
+  app:
+    description: 'Application name to deploy'
+    required: true
+  protocol:
+    description: 'Preferred connection protocol (https/http)'
     required: false
-    default: ''
+    default: 'https'
   skip_tls_verify:
     description: 'Skip TLS verification (true/false)'
-    required: false
+    required: false 
     default: 'false'
 
 runs:
   using: "composite"
   steps:
+    - name: Checkout Repository
+      uses: actions/checkout@v4
+      with:
+        fetch-depth: 0
 
-    - name: Debug Environment Variables
-      shell: bash
-      run: |
-        echo "KUBE_HOST: ${{ env.KUBE_HOST }}" | sed 's/./& /g'
-        echo "KUBE_TOKEN: ${{ env.KUBE_TOKEN }}" 
-        echo "KUBE_CERTIFICATE: ${{ env.KUBE_CERTIFICATE }}"
-        echo "KUBE_CONFIG: ${{ env.KUBE_CONFIG }}"
-
-
-    - name: Setup kubectl config
+    - name: Verify CA Certificate
       shell: bash
       run: |
         echo "${{ env.KUBE_CERTIFICATE }}" | base64 --decode > ca.crt
-        mkdir -p ~/.kube
-        echo "${{ env.KUBE_CONFIG }}" | base64 --decode > ~/.kube/config
-        kubectl config set-cluster microk8s --certificate-authority=ca.crt
-      env:
-        KUBE_CERTIFICATE: ${{ env.KUBE_CERTIFICATE }}
-        KUBE_CONFIG: ${{ env.KUBE_CONFIG }}
+        if [[ ! -s ca.crt ]]; then
+          echo "Error: CA certificate is empty"
+          exit 1
+        fi
+        openssl x509 -in ca.crt -text -noout
 
-    - name: Change directory
-      if: ${{ inputs.working_directory != '' }}
+    - name: Determine Protocol
+      if: ${{ inputs.protocol == '' }}
+      id: check_protocol
       shell: bash
-      run: cd ${{ inputs.working_directory }}
+      run: |
+        # Simplified protocol detection logic
+        if curl -k -I "https://${{ env.KUBE_HOST }}" &> /dev/null; then
+          echo "protocol=https" >> $GITHUB_OUTPUT
+        else
+          echo "protocol=http" >> $GITHUB_OUTPUT
+        fi
 
     - name: Debug working directory
       shell: bash

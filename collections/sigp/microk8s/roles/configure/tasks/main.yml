@@ -3,24 +3,9 @@
   include_tasks: common.yml
   tags: always
 
-# - name: Verify join_command is available
-#   assert:
-#     that:
-#       - join_command is defined
-#     fail_msg: |
-#       join_command not available. Possible issues:
-#       - No k8s_master group in inventory
-#       - Primary node unreachable
-#       - microk8s not installed on primary
-#       - Debug info:
-#         Groups: {{ groups.keys() }}
-#         Primary: {{ microk8s_primary }}
-#         Raw output: {{ join_command_raw | default('Not generated') }}
+
   
-- name: Debug join_command availability
-  debug:
-    var: join_command
-    verbosity: 1
+- include_tasks: ntp.yaml
 
 - name: Include master configuration
   include_tasks: master.yml
@@ -47,9 +32,3 @@
     - not microk8s_sequential_join | default(false)
   tags: node_management
 
-- name: Include sequential worker join tasks
-  include_tasks: sequential_join.yml
-  when:
-    - inventory_hostname in groups['k8s_worker']
-    - microk8s_sequential_join | default(false)
-  tags: node_management

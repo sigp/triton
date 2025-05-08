@@ -1,0 +1,121 @@
+---
+
+    - name: Get worker node list
+      set_fact:
+        worker_nodes: "{{ groups['k8s_worker'] }}"
+      
+    - name: Display worker nodes to be added
+      debug:
+        msg: "Will add the following worker nodes to the cluster: {{ worker_nodes }}"
+
+
+    - name: Debug value of groups['k8s_master'][0]
+      debug:
+        msg: "Value of groups['k8s_master'][0].ansible_host: {{ hostvars[groups['k8s_master'][0]].ansible_ssh_host }}"
+
+        
+    - name: We need to add the master node to the inventory because delegate_to does not work with non standard port
+      ansible.builtin.add_host:
+        hostname: k8s_api
+        ansible_ssh_host: "{{hostvars[groups['k8s_master'][0]].ansible_ssh_host}}"
+        ansible_ssh_port: "{{hostvars[groups['k8s_master'][0]].ansible_port}}"
+        ansible_user: "{{hostvars[groups['k8s_master'][0]].ansible_user}}"
+
+    - name: Get join token from master
+      command: microk8s add-node --format json
+      register: add_node_output
+      delegate_to: k8s_api
+      
+    - name: Parse join command output
+      set_fact:
+        join_token: "{{ add_node_output.stdout | from_json }}"
+        
+    - name: Show join token information
+      debug:
+        msg: "Got join token with URLs: {{ join_token.urls }}"
+    
+
+    - name: Join worker node to cluster
+      block:
+        - name: Try joining with first URL
+          delegate_to: "{{ inventory_hostname }}"
+          command: "microk8s join {{ join_token.urls[0] }} --worker"
+          register: join_result
+          ignore_errors: yes
+      
+        - name: Try joining with second URL if first failed
+          delegate_to: "{{ inventory_hostname }}"
+          command: "microk8s join {{ join_token.urls[1] }} --worker"
+          register: join_result_2
+          when: join_result.rc is defined and join_result.rc != 0
+          ignore_errors: yes
+          
+        - name: Try joining with third URL if second failed
+          delegate_to: "{{ inventory_hostname }}"
+          command: "microk8s join {{ join_token.urls[2] }} --worker"
+          register: join_result_3
+          when: >
+            (join_result.rc is defined and join_result.rc != 0) and
+            (join_result_2.rc is defined and join_result_2.rc != 0)
+          ignore_errors: yes
+      
+        - name: Check join status
+          set_fact:
+            join_success: >
+              {{ 
+                (join_result.rc is not defined or join_result.rc == 0) or
+                (join_result_2.rc is not defined or join_result_2.rc == 0) or
+                (join_result_3.rc is not defined or join_result_3.rc == 0)
+              }}
+              
+        - name: Add node labels if configured
+          kubernetes.core.k8s:
+            api_version: v1
+            kind: Node
+            name: "{{ inventory_hostname }}"
+            state: present
+            merge_type: strategic-merge
+            definition:
+              metadata:
+                labels: "{{ hostvars[inventory_hostname].node_label_dict | default({}) }}"
+          when: hostvars[inventory_hostname].node_label_dict is defined
+          register: label_result
+          retries: 3
+          delegate_to: k8s_api
+          delay: 5
+          until: label_result is not failed
+          ignore_errors: "{{ ansible_check_mode }}"
+              
+        - name: Get the first nameserver from MicroK8s resolv.conf
+          shell: |
+           awk '/^nameserver/ && $2 !~ /:/ {print $2; exit}' $(snap run --shell microk8s -c '$SNAP/scripts/find-resolv-conf.py')
+          args:
+            executable: /bin/bash
+          register: cluster_dns_ip
+        
+    # - name: Get cluster DNS IP
+    #   shell: |
+    #     fish -c 'set resolv_file (snap run --shell microk8s -c "$SNAP/scripts/find-resolv-conf.py"); awk "/^nameserver/ {print \$2; exit}" $resolv_file'
+
+    #   register: cluster_dns_ip
+    #   changed_when: false
+
+    - name: Enable MicroK8s DNS
+      command: "microk8s enable {{ item }}"
+      become: yes
+      delegate_to: k8s_api
+      ignore_errors: true
+      loop:
+        - "dns:{{ cluster_dns_ip.stdout }}"
+
+    - name: Configure MicroK8s kubelet args
+      lineinfile:
+        path: /var/snap/microk8s/current/args/kubelet
+        regexp: '^--cluster-dns='
+        line: "--cluster-dns={{ cluster_dns_ip.stdout }}"
+        state: present
+        backup: yes
+      notify: restart microk8s
+
+
+

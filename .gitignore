@@ -1,2 +1,4 @@
 .qodo
 /inv
+collections/sigp/ansible_collections/*
+collections/ansible_collections/

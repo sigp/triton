@@ -3,7 +3,6 @@
 
 # Features to enable
 microk8s_features:
-  - dns
   - storage:size=40Gi
   - dashboard
   - community

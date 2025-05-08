@@ -1,0 +1,96 @@
+---
+
+      - name: Stop and disable systemd-timesyncd
+        ansible.builtin.systemd:
+          name: systemd-timesyncd
+          state: stopped
+          enabled: no
+        failed_when: false
+        when: ansible_os_family == "Debian"
+  
+      - name: Check for systemd-timesyncd package
+        ansible.builtin.command: dpkg-query -W -f='${Status}' systemd-timesyncd
+        register: systemd_timesyncd_check
+        changed_when: false
+        failed_when: false
+        when: ansible_os_family == "Debian"
+  
+      - name: Check for ntpsec package
+        ansible.builtin.command: dpkg-query -W -f='${Status}' ntpsec
+        register: ntpsec_check
+        changed_when: false
+        failed_when: false
+        when: ansible_os_family == "Debian"
+  
+      - name: Remove systemd-timesyncd package if installed
+        become: true
+        ansible.builtin.apt:
+          name: systemd-timesyncd
+          state: absent
+          purge: yes
+        when: 
+          - ansible_os_family == "Debian"
+          - systemd_timesyncd_check.rc == 0
+          - "'installed' in systemd_timesyncd_check.stdout"
+  
+      - name: Remove ntpsec package if installed
+        ansible.builtin.apt:
+          name: ntpsec
+          state: absent
+          purge: yes
+        when: 
+          - ansible_os_family == "Debian"
+          - ntpsec_check.rc == 0
+          - "'installed' in ntpsec_check.stdout"
+  
+      - name: Clear apt cache
+        become: true
+        ansible.builtin.command: apt-get clean
+        changed_when: true
+        when: ansible_os_family == "Debian"
+  
+      - name: Update package cache
+        become: true
+        ansible.builtin.apt:
+          update_cache: yes
+          cache_valid_time: 0
+        when: ansible_os_family == "Debian"
+  
+      - name: Install NTP package
+        become: true
+        ansible.builtin.apt:
+          name: ntp
+          state: present
+          install_recommends: yes
+          update_cache: yes
+        when: ansible_os_family == "Debian"
+  
+      - name: Configure timezone
+        become: true
+        ansible.builtin.timezone:
+          name: UTC
+  
+      - name: Configure NTP servers
+        become: true
+        ansible.builtin.template:
+          src: ../templates/ntp.conf.j2
+          dest: /etc/ntp.conf
+          owner: root
+          group: root
+          mode: 0644
+        vars:
+          ntp_servers:
+            - 0.pool.ntp.org
+            - 1.pool.ntp.org
+            - 2.pool.ntp.org
+            - 3.pool.ntp.org
+        notify: restart ntp
+  
+      # - name: Ensure NTP service is running and enabled
+      #   notify: restart ntp
+      #   become: true
+      #   ansible.builtin.service:
+      #     name: ntp
+      #     state: restarted
+      #     enabled: yes
+  

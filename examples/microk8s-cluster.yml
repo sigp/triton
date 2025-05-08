@@ -2,15 +2,40 @@
 - name: Configure MicroK8s cluster
   hosts: k8s_master:k8s_worker
   gather_facts: true
+  collections:
+  - sigp.microk8s.install
+  - community.general
+
+
 
   vars:
+    ansible_roles_path: "~/git/sigp/triton/collections/sigp/microk8s/roles:{{ ansible_roles_path }}"
     microk8s_addons:
       - dns
       - dashboard
       - storage
 
   tasks:
-    - name: Configure MicroK8s
+
+    - name: Install MicroK8s
       import_role:
-        name: sigp.microk8s.configure
-      tags: configure
+        name: "{{ lookup('env', 'HOME') }}/git/sigp/triton/collections/sigp/microk8s/roles/install"
+
+
+    - name: Configure MicroK8s
+      include_role:
+        name: "{{ lookup('env', 'HOME') }}/git/sigp/triton/collections/sigp/microk8s/roles/configure"
+      # tags: configure
+
+- name: Add Worker Nodes to MicroK8s Cluster
+  hosts: k8s_worker
+  gather_facts: true
+  serial: 1
+  environment:
+    K8S_AUTH_KUBECONFIG: /var/snap/microk8s/current/credentials/client.config
+    KUBECONFIG: /var/snap/microk8s/current/credentials/kubelet.config
+  tasks:
+    - name: Configure MicroK8s
+      include_role:
+        name: "{{ lookup('env', 'HOME') }}/git/sigp/triton/collections/sigp/microk8s/roles/configure"
+        tasks_from: add-nodes
