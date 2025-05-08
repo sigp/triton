@@ -104,15 +104,27 @@
     #   register: cluster_dns_ip
     #   changed_when: false
 
-    - name: Enable MicroK8s DNS
+    - name: Enable MicroK8s DNS with dns hack
       command: "microk8s enable {{ item }}"
+      when: microk8s_dns_hack
       become: yes
       delegate_to: k8s_api
       ignore_errors: true
       loop:
         - "dns:{{ cluster_dns_ip.stdout }}"
 
+    - name: Enable MicroK8s DNS without dns hack
+      command: "microk8s enable {{ item }}"
+      when: not microk8s_dns_hack
+      become: yes
+      delegate_to: k8s_api
+      ignore_errors: true
+      loop:
+        - dns
+        
+
     - name: Configure MicroK8s kubelet args
+      when: microk8s_dns_hack
       lineinfile:
         path: /var/snap/microk8s/current/args/kubelet
         regexp: '^--cluster-dns='
