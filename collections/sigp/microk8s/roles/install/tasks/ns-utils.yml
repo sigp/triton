@@ -1,0 +1,7 @@
+---      
+- name: Upload utils for deleting namespace
+  copy:
+    src: ../scripts/force_delete_ns.sh
+    dest: /tmp/force_delete_ns.sh
+    mode: '0755'
+  

@@ -33,3 +33,8 @@ ansible-galaxy collection install git+https://github.com/sigp/triton.git
 To reference the GitHub workflows in your repository:
 ```yaml
 uses: sigp/triton/workflows/k8s/kubectl.yml@main
+
+```
+# Developing
+
+`ansible-galaxy collection install community.general` is required before running any of the `/examples` playbooks

@@ -5,8 +5,7 @@
 
 
   
-- name: Include NTP configuration playbook
-  import_playbook: ../ntp.yaml
+- include_tasks: ntp.yaml
 
 - name: Include master configuration
   include_tasks: master.yml
@@ -33,9 +32,3 @@
     - not microk8s_sequential_join | default(false)
   tags: node_management
 
-- name: Include sequential worker join tasks
-  include_tasks: sequential_join.yml
-  when:
-    - inventory_hostname in groups['k8s_worker']
-    - microk8s_sequential_join | default(false)
-  tags: node_management
