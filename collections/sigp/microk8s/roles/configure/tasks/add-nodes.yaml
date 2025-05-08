@@ -24,6 +24,7 @@
     - name: Get join token from master
       command: microk8s add-node --format json
       register: add_node_output
+      become: true
       delegate_to: k8s_api
       
     - name: Parse join command output
@@ -40,12 +41,14 @@
         - name: Try joining with first URL
           delegate_to: "{{ inventory_hostname }}"
           command: "microk8s join {{ join_token.urls[0] }} --worker"
+          become: true
           register: join_result
           ignore_errors: yes
       
         - name: Try joining with second URL if first failed
           delegate_to: "{{ inventory_hostname }}"
           command: "microk8s join {{ join_token.urls[1] }} --worker"
+          become: true          
           register: join_result_2
           when: join_result.rc is defined and join_result.rc != 0
           ignore_errors: yes
@@ -53,6 +56,7 @@
         - name: Try joining with third URL if second failed
           delegate_to: "{{ inventory_hostname }}"
           command: "microk8s join {{ join_token.urls[2] }} --worker"
+          become: true
           register: join_result_3
           when: >
             (join_result.rc is defined and join_result.rc != 0) and
