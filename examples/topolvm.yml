@@ -1,0 +1,136 @@
+---
+# topolvm.yml
+# This playbook handles inspection and installation of TopoLVM on a microk8s cluster
+# - Inspect nodes for LVM suitability
+
+
+- name: Check LVM configuration on nodes
+  hosts: all
+  become: yes
+  gather_facts: yes
+  tasks:
+    - name: Ensure required packages are installed
+      package:
+        name: 
+          - lvm2
+          - thin-provisioning-tools
+        state: present
+      register: package_install
+
+    - name: Get list of physical volumes
+      command: pvs --noheadings -o pv_name
+      register: pvs_output
+      changed_when: false
+
+    - name: Get list of volume groups
+      command: vgs --noheadings -o vg_name
+      register: vgs_output
+      changed_when: false
+
+    - name: Get list of logical volumes
+      command: lvs --noheadings -o vg_name,lv_name
+      register: lvs_output
+      changed_when: false
+
+    - name: Check for available free space (unallocated physical volumes)
+      command: pvs --noheadings -o pv_name,vg_name,pv_free
+      register: free_space
+      changed_when: false
+
+    - name: Check if lvm2-lvmpolld service is running (modern LVM)
+      service:
+        name: lvm2-lvmpolld
+        state: started
+        enabled: yes
+      register: lvm_service
+      ignore_errors: yes
+
+    - name: Show LVM status summary
+      debug:
+        msg: |
+          Node: {{ ansible_hostname }}
+          Physical Volumes: {{ pvs_output.stdout_lines | length }}
+          Volume Groups: {{ vgs_output.stdout_lines | length }}
+          Logical Volumes: {{ lvs_output.stdout_lines | length }}
+          LVM Service Status: {% if lvm_service is not failed and lvm_service.state is defined %}{{ 'Running' if lvm_service.state == 'started' else 'Not running' }}{% else %}Service check failed{% endif %}
+
+    - name: Gather all block devices info
+      command: lsblk -J
+      register: block_devices
+      changed_when: false
+
+    - name: Check if any block devices are available for LVM
+      set_fact:
+        available_devices: "{{ block_devices.stdout | from_json | json_query('blockdevices[?type==`disk` && children==null]') }}"
+
+    - name: Show available devices
+      debug:
+        msg: |
+          Available devices for potential LVM use:
+          {{ available_devices | map(attribute='name') | list }}
+          
+    # Store all collected info as facts for later use
+    - name: Set node LVM facts
+      set_fact:
+        lvm_configured: "{{ vgs_output.stdout_lines | length > 0 }}"
+        has_available_devices: "{{ available_devices | length > 0 }}"
+        node_ready_for_topolvm: false  # Default value
+
+    - name: Check for TopoLVM volume group
+      set_fact:
+        topolvm_vg_exists: "{{ 'topolvm-vg' in vgs_output.stdout }}"
+
+    - name: Determine if node is ready for TopoLVM
+      set_fact:
+        node_ready_for_topolvm: "{{ lvm_configured or has_available_devices }}"
+
+    # Register host status in a way that can be used by the next play
+    - name: Register host LVM status for inventory
+      add_host:
+        name: "{{ inventory_hostname }}"
+        group: topolvm_ready_nodes
+        lvm_status: "{{ node_ready_for_topolvm | bool }}"
+        topolvm_vg_exists: "{{ topolvm_vg_exists | default(false) | bool }}"
+        available_devices: "{{ available_devices | map(attribute='name') | list }}"
+      when: node_ready_for_topolvm | bool
+
+- name: Install and configure TopoLVM on the cluster
+  hosts: k8s_master[0]
+  become: yes
+  vars:
+    topolvm_version: "0.19.0"
+    topolvm_vg_name: "topolvm-vg"
+    kube_config: "/var/snap/microk8s/current/credentials/client.config"
+  tasks:
+    - name: Show nodes that are suitable for TopoLVM
+      debug:
+        msg: "Nodes suitable for TopoLVM: {{ groups['topolvm_ready_nodes'] | default([]) }}"
+
+    - name: Check if any nodes are ready for TopoLVM
+      fail:
+        msg: "No nodes are ready for TopoLVM. Ensure nodes have LVM configured or have available disk space."
+      when: groups['topolvm_ready_nodes'] is not defined or groups['topolvm_ready_nodes'] | length == 0
+
+    - name: Ensure kubectl is available
+      command: microk8s kubectl version --client
+      register: kubectl_version
+      changed_when: false
+      failed_when: kubectl_version.rc != 0
+
+    - name: Ensure storage addon is enabled in microk8s
+      command: microk8s enable storage
+      register: storage_result
+      changed_when: "'Enabling default storage class' in storage_result.stdout"
+      failed_when: storage_result.rc != 0
+
+    - name: Ensure helm is available
+      command: microk8s helm3 version --client
+      register: helm_version
+      changed_when: false
+      failed_when: helm_version.rc != 0
+
+    - name: Create temporary directory for TopoLVM manifests
+      file:
+        path: /tmp/topolvm-setup
+        state: directory
+        mode: '0755'
