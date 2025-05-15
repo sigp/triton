@@ -61,13 +61,24 @@
 
     - name: Check if any block devices are available for LVM
       set_fact:
-        available_devices: "{{ block_devices.stdout | from_json | json_query('blockdevices[?type==`disk` && children==null]') }}"
+        available_devices: >-
+          {{ block_devices.stdout | from_json | json_query('blockdevices[?type==`disk` && children==null].name') | default([]) }}
+
+    - name: Validate available devices
+      assert:
+        that:
+          - available_devices is defined
+          - available_devices | length > 0
+        fail_msg: "No suitable block devices found for LVM"
+        success_msg: "Found {{ available_devices | length }} available device(s)"
+      ignore_errors: yes
 
     - name: Show available devices
       debug:
         msg: |
           Available devices for potential LVM use:
-          {{ available_devices | map(attribute='name') | list }}
+          {{ available_devices | list }}
+      when: available_devices is defined
           
     # Store all collected info as facts for later use
     - name: Set node LVM facts
@@ -91,7 +102,7 @@
         group: topolvm_ready_nodes
         lvm_status: "{{ node_ready_for_topolvm | bool }}"
         topolvm_vg_exists: "{{ topolvm_vg_exists | default(false) | bool }}"
-        available_devices: "{{ available_devices | map(attribute='name') | list }}"
+        available_devices: "{{ available_devices | list }}"
       when: node_ready_for_topolvm | bool
 
 - name: Install and configure TopoLVM on the cluster
@@ -142,9 +153,12 @@
   tasks:
     - name: Create physical volume on first available device
       command: "pvcreate /dev/{{ available_devices[0] }}"
-      when: 
-        - not topolvm_vg_exists 
+      when:
+        - not topolvm_vg_exists
         - available_devices | length > 0
+      register: pvcreate_result
+      changed_when: pvcreate_result.rc == 0
+      failed_when: pvcreate_result.rc not in [0, 5]  # 5 means device already initialized
 
     - name: Create TopoLVM volume group
       command: "vgcreate {{ topolvm_vg_name }} /dev/{{ available_devices[0] }}"
