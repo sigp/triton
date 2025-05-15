@@ -134,3 +134,152 @@
         path: /tmp/topolvm-setup
         state: directory
         mode: '0755'
+
+# Configure nodes - create volume group if needed
+- name: Create TopoLVM volume group on nodes that don't have it
+  hosts: topolvm_ready_nodes    
+  become: yes
+  tasks:
+    - name: Create physical volume on first available device
+      command: "pvcreate /dev/{{ available_devices[0] }}"
+      when: 
+        - not topolvm_vg_exists 
+        - available_devices | length > 0
+
+    - name: Create TopoLVM volume group
+      command: "vgcreate {{ topolvm_vg_name }} /dev/{{ available_devices[0] }}"
+      when: 
+        - not topolvm_vg_exists 
+        - available_devices | length > 0
+
+    # Continue with master node setup
+    - name: Download TopoLVM Helm chart
+      command: >
+        microk8s helm3 repo add topolvm https://topolvm.github.io/topolvm
+      changed_when: false
+
+    - name: Update Helm repositories
+      command: microk8s helm3 repo update
+      changed_when: false
+
+    # Create CRDs and namespace first
+    - name: Create namespace for TopoLVM
+      k8s:
+        kubeconfig: "{{ kube_config }}"
+        state: present
+        definition:
+          apiVersion: v1
+          kind: Namespace
+          metadata:
+            name: topolvm-system
+
+    - name: Download TopoLVM chart to extract CRDs
+      command: >
+        microk8s helm3 pull topolvm/topolvm --version {{ topolvm_version }} --untar --untardir /tmp/topolvm-setup
+      changed_when: true
+      
+    - name: Apply TopoLVM CRDs
+      command: >
+        microk8s kubectl apply -f /tmp/topolvm-setup/topolvm/crds
+      changed_when: true
+
+    # Create values.yaml for Helm
+    - name: Create values.yaml for TopoLVM helm chart
+      copy:
+        dest: /tmp/topolvm-setup/values.yaml
+        content: |
+          node:
+            lvmd:
+              deviceClasses:
+                - name: ssd
+                  volume-group: {{ topolvm_vg_name }}
+                  default: true
+                  spare-gb: 10
+          scheduler:
+            enable: true
+          lvmd:
+            managed: true
+
+    # Install TopoLVM using Helm
+    - name: Install TopoLVM with Helm
+      command: >
+        microk8s helm3 install topolvm topolvm/topolvm 
+        --namespace topolvm-system 
+        --version {{ topolvm_version }}
+        --values /tmp/topolvm-setup/values.yaml
+      changed_when: true
+
+    # Wait for TopoLVM to be ready
+    - name: Wait for TopoLVM pods to be ready
+      command: >
+        microk8s kubectl wait --for=condition=Ready pods -l app.kubernetes.io/name=topolvm -n topolvm-system --timeout=300s
+      register: pod_wait
+      changed_when: false
+      retries: 5
+      delay: 20
+      until: pod_wait.rc == 0
+
+    # Create StorageClass
+    - name: Create StorageClass for TopoLVM
+      k8s:
+        kubeconfig: "{{ kube_config }}"
+        state: present
+        definition:
+          apiVersion: storage.k8s.io/v1
+          kind: StorageClass
+          metadata:
+            name: topolvm-ssd
+          provisioner: topolvm.io
+          parameters:
+            "csi.storage.k8s.io/fstype": "xfs"
+            "topolvm.io/device-class": "ssd"
+          volumeBindingMode: WaitForFirstConsumer
+          allowVolumeExpansion: true
+
+    # Test deployment (optional)
+    - name: Create a test PVC
+      k8s:
+        kubeconfig: "{{ kube_config }}"
+        state: present
+        definition:
+          apiVersion: v1
+          kind: PersistentVolumeClaim
+          metadata:
+            name: topolvm-test-pvc
+            namespace: default
+          spec:
+            accessModes:
+              - ReadWriteOnce
+            resources:
+              requests:
+                storage: 1Gi
+            storageClassName: topolvm-ssd
+
+    - name: Display test instructions
+      debug:
+        msg: |
+          TopoLVM has been installed on your microk8s cluster.
+          A test PVC has been created. You can verify with:
+          
+          microk8s kubectl get pvc topolvm-test-pvc
+          
+          To create a test pod using this PVC:
+          
+          microk8s kubectl create -f - <<EOF
+          apiVersion: v1
+          kind: Pod
+          metadata:
+            name: topolvm-test-pod
+          spec:
+            containers:
+            - name: test-container
+              image: busybox
+              command: ["sh", "-c", "while true; do echo Success; sleep 10; done"]
+              volumeMounts:
+              - mountPath: "/data"
+                name: test-volume
+            volumes:
+            - name: test-volume
+              persistentVolumeClaim:
+                claimName: topolvm-test-pvc
+          EOF
