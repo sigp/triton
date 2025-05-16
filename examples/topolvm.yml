@@ -181,6 +181,7 @@
   environment:
     K8S_AUTH_KUBECONFIG: /var/snap/microk8s/current/credentials/client.config
     KUBECONFIG: /var/snap/microk8s/current/credentials/kubelet.config
+    CERT_MANAGER_VERSION: "v1.17.1"
   vars:
     topolvm_version: "v15.5.5"
     kube_config: "/var/snap/microk8s/current/credentials/client.config"
@@ -232,23 +233,29 @@
 
     - name: Ensure required namespaces exist and label them for TopoLVM webhook
       delegate_to: k8s_api
-      kubernetes.core.k8s:            
+      kubernetes.core.k8s:
+        state: present
         definition:
           apiVersion: v1
           kind: Namespace
-          state: present
           metadata:
-          name: "{{ item }}"
-          labels:
-            topolvm.io/webhook: "ignore"
+            name: "{{ item }}"
+            labels:
+              topolvm.io/webhook: "ignore"
       loop:
-      - topolvm-system
-      - kube-system    
+        - topolvm-system
+        - kube-system
 
+    - name: Ensure cert-manager is installed
+      delegate_to: k8s_api
+      command: >
+        microk8s kubectl apply -f https://github.com/cert-manager/cert-manager/releases/download/${CERT_MANAGER_VERSION}/cert-manager.crds.yaml
+      changed_when: true
 
     - name: Apply TopoLVM CRDs
+      delegate_to: k8s_api
       command: >
-        microk8s helm3 install --namespace=topolvm-system topolvm topolvm/topolvm
+        microk8s helm3 upgrade --install --namespace=topolvm-system topolvm topolvm/topolvm --set cert-manager.enabled=true
       # changed_when: true
 
     # Create values.yaml for Helm
@@ -270,8 +277,9 @@
 
     # Install TopoLVM using Helm
     - name: Install TopoLVM with Helm
+      delegate_to: k8s_api
       command: >
-        microk8s helm3 install topolvm topolvm/topolvm 
+        microk8s helm3 upgrade --install  topolvm topolvm/topolvm 
         --namespace topolvm-system 
         --version {{ topolvm_version }}
         --values /tmp/topolvm-setup/values.yaml
