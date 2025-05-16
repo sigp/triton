@@ -59,10 +59,30 @@
       register: block_devices
       changed_when: false
 
-    - name: Check if any block devices are available for LVM
+    - name: Get raw block devices info
+      command: lsblk -J -o NAME,TYPE,MOUNTPOINTS
+      register: block_devices_raw
+      changed_when: false
+      ignore_errors: yes
+
+    - name: Parse block devices info
       set_fact:
         available_devices: >-
-          {{ block_devices.stdout | from_json | json_query('blockdevices[?type==`disk` && children==null].name') | default([]) }}
+          {% if block_devices_raw.stdout and block_devices_raw.stdout | from_json %}
+            {% set devices = block_devices_raw.stdout | from_json %}
+            {% for device in devices.blockdevices %}
+              {% if device.type == 'disk' and not device.mountpoints %}
+                {{ device.name }}
+              {% endif %}
+            {% endfor %}
+          {% else %}
+            []
+          {% endif %}
+
+    - name: Show available devices
+      debug:
+        var: available_devices
+      when: available_devices is defined
 
     - name: Validate available devices
       assert:
@@ -103,14 +123,16 @@
         lvm_status: "{{ node_ready_for_topolvm | bool }}"
         topolvm_vg_exists: "{{ topolvm_vg_exists | default(false) | bool }}"
         available_devices: "{{ available_devices | list }}"
+        topolvm_vg_name: "{{ topolvm_vg_name | default('topolvm-vg') }}"
+        kube_config: "{{ kube_config | default('/var/snap/microk8s/current/credentials/client.config') }}"
+        topolvm_version: "{{ topolvm_version | default('0.19.0') }}"
       when: node_ready_for_topolvm | bool
 
 - name: Install and configure TopoLVM on the cluster
   hosts: k8s_master[0]
   become: yes
   vars:
-    topolvm_version: "0.19.0"
-    topolvm_vg_name: "topolvm-vg"
+    topolvm_version: "v15.5.5"
     kube_config: "/var/snap/microk8s/current/credentials/client.config"
   tasks:
     - name: Show nodes that are suitable for TopoLVM
@@ -149,6 +171,9 @@
 # Configure nodes - create volume group if needed
 - name: Create TopoLVM volume group on nodes that don't have it
   hosts: topolvm_ready_nodes    
+  vars:
+    topolvm_version: "v15.5.5"
+    kube_config: "/var/snap/microk8s/current/credentials/client.config"
   become: yes
   tasks:
     - name: Create physical volume on first available device
@@ -162,9 +187,12 @@
 
     - name: Create TopoLVM volume group
       command: "vgcreate {{ topolvm_vg_name }} /dev/{{ available_devices[0] }}"
-      when: 
-        - not topolvm_vg_exists 
+      when:
+        - not topolvm_vg_exists
         - available_devices | length > 0
+      register: vgcreate_result
+      changed_when: vgcreate_result.rc == 0
+      failed_when: vgcreate_result.rc not in [0, 5]  # 5 means volume group already exists
 
     # Continue with master node setup
     - name: Download TopoLVM Helm chart
