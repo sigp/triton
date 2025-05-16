@@ -128,6 +128,13 @@
         topolvm_version: "{{ topolvm_version | default('0.19.0') }}"
       when: node_ready_for_topolvm | bool
 
+    - name: We need to add the master node to the inventory because delegate_to does not work with non standard port
+      ansible.builtin.add_host:
+        hostname: k8s_api
+        ansible_ssh_host: "{{hostvars[groups['k8s_master'][0]].ansible_ssh_host}}"
+        ansible_ssh_port: "{{hostvars[groups['k8s_master'][0]].ansible_port}}"
+        ansible_user: "{{hostvars[groups['k8s_master'][0]].ansible_user}}"
+
 - name: Install and configure TopoLVM on the cluster
   hosts: k8s_master[0]
   become: yes
@@ -171,6 +178,9 @@
 # Configure nodes - create volume group if needed
 - name: Create TopoLVM volume group on nodes that don't have it
   hosts: topolvm_ready_nodes    
+  environment:
+    K8S_AUTH_KUBECONFIG: /var/snap/microk8s/current/credentials/client.config
+    KUBECONFIG: /var/snap/microk8s/current/credentials/kubelet.config
   vars:
     topolvm_version: "v15.5.5"
     kube_config: "/var/snap/microk8s/current/credentials/client.config"
@@ -215,15 +225,31 @@
           metadata:
             name: topolvm-system
 
-    - name: Download TopoLVM chart to extract CRDs
-      command: >
-        microk8s helm3 pull topolvm/topolvm --version {{ topolvm_version }} --untar --untardir /tmp/topolvm-setup
+    - name: Add the TopoLVM helm repository
+      shell: >
+        microk8s helm repo add topolvm https://topolvm.github.io/topolvm && microk8s helm repo update
       changed_when: true
-      
+
+    - name: Ensure required namespaces exist and label them for TopoLVM webhook
+      delegate_to: k8s_api
+      kubernetes.core.k8s:            
+        definition:
+          apiVersion: v1
+          kind: Namespace
+          state: present
+          metadata:
+          name: "{{ item }}"
+          labels:
+            topolvm.io/webhook: "ignore"
+      loop:
+      - topolvm-system
+      - kube-system    
+
+
     - name: Apply TopoLVM CRDs
       command: >
-        microk8s kubectl apply -f /tmp/topolvm-setup/topolvm/crds
-      changed_when: true
+        microk8s helm3 install --namespace=topolvm-system topolvm topolvm/topolvm
+      # changed_when: true
 
     # Create values.yaml for Helm
     - name: Create values.yaml for TopoLVM helm chart
