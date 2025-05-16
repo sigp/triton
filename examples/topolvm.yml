@@ -8,6 +8,8 @@
   hosts: all
   become: yes
   gather_facts: yes
+  vars:
+    topolvm_version: "v15.5.5"
   tasks:
     - name: Ensure required packages are installed
       package:
@@ -125,7 +127,7 @@
         available_devices: "{{ available_devices | list }}"
         topolvm_vg_name: "{{ topolvm_vg_name | default('topolvm-vg') }}"
         kube_config: "{{ kube_config | default('/var/snap/microk8s/current/credentials/client.config') }}"
-        topolvm_version: "{{ topolvm_version | default('0.19.0') }}"
+        topolvm_version: "{{ topolvm_version  }}"
       when: node_ready_for_topolvm | bool
 
     - name: We need to add the master node to the inventory because delegate_to does not work with non standard port
@@ -270,10 +272,30 @@
                   volume-group: {{ topolvm_vg_name }}
                   default: true
                   spare-gb: 10
+              extraVolumes:
+                - name: lvmd-config
+                  configMap:
+                    name: lvmd-config
+              extraVolumeMounts:
+                - name: lvmd-config
+                  mountPath: /etc/topolvm/lvmd.yaml
+                  subPath: lvmd.yaml
           scheduler:
             enable: true
           lvmd:
             managed: true
+
+    # Create ConfigMap with lvmd configuration
+    - name: Create lvmd ConfigMap
+      delegate_to: k8s_api
+      command: >
+        microk8s kubectl create configmap -n topolvm-system lvmd-config --from-literal=lvmd.yaml='
+        deviceClasses:
+          - name: ssd
+            volume-group: {{ topolvm_vg_name }}
+            default: true
+            spare-gb: 10
+        '
 
     # Install TopoLVM using Helm
     - name: Install TopoLVM with Helm
