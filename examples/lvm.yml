@@ -1,0 +1,125 @@
+---
+- name: Analyze server and create LVM volume group if possible
+  hosts: all
+  become: true
+  vars:
+    vg_name: "new_vg"
+    pv_devices: []  # Will be populated during execution
+    min_disk_size_gb: 5  # Minimum disk size in GB to consider for LVM
+
+  tasks:
+    - name: Check if LVM2 is installed
+      package:
+        name: lvm2
+        state: present
+      register: lvm2_install
+      ignore_errors: yes
+
+    - name: Gather facts about available disks
+      command: lsblk -bpno NAME,SIZE,TYPE,MOUNTPOINT,FSTYPE
+      register: lsblk_output
+      changed_when: false
+      when: lvm2_install is success
+
+    - name: Parse available disks
+      set_fact:
+        available_disks: "{{ lsblk_output.stdout_lines | select('match', '^\/dev\/.*disk.*$') | list }}"
+      when: lvm2_install is success
+
+    - name: Display available disks
+      debug:
+        var: available_disks
+      when: lvm2_install is success
+
+    - name: Check if any disk is already part of a PV
+      command: pvs --noheadings -o pv_name
+      register: existing_pvs
+      changed_when: false
+      when: lvm2_install is success
+
+    - name: Find unpartitioned disks not already in use
+      set_fact:
+        candidate_disks: []
+      when: lvm2_install is success
+
+    - name: Analyze each disk for LVM eligibility
+      block:
+        - name: Get detailed info for each disk
+          shell: "lsblk -bpno NAME,SIZE,TYPE,MOUNTPOINT,FSTYPE {{ item.split()[0] }}"
+          register: disk_details
+          with_items: "{{ available_disks }}"
+          changed_when: false
+
+        - name: Parse disk details
+          set_fact:
+            candidate_disks: "{{ candidate_disks + [item.item.split()[0]] }}"
+          when: 
+            - item.stdout | regex_search('part') is not defined  # No partitions on disk
+            - item.item.split()[0] not in existing_pvs.stdout    # Not already a PV
+            - (item.item.split()[1] | int) > (min_disk_size_gb * 1073741824)  # Larger than min size
+          with_items: "{{ disk_details.results }}"
+      when: 
+        - lvm2_install is success
+        - available_disks is defined and available_disks | length > 0
+
+    - name: Display candidate disks for LVM
+      debug:
+        msg: "Disks eligible for LVM: {{ candidate_disks | default([]) }}"
+      when: lvm2_install is success
+
+    - name: Check if volume group already exists
+      command: vgs {{ vg_name }}
+      register: vg_exists
+      changed_when: false
+      failed_when: false
+      when: lvm2_install is success
+
+    - name: Create physical volumes on candidate disks
+      command: "pvcreate {{ item }}"
+      with_items: "{{ candidate_disks | default([]) }}"
+      register: pv_create
+      when: 
+        - lvm2_install is success
+        - candidate_disks is defined and candidate_disks | length > 0
+        - vg_exists.rc != 0  # Volume group doesn't exist yet
+
+    - name: Display physical volume creation results
+      debug:
+        var: pv_create
+      when: pv_create is defined and pv_create.changed
+
+    - name: Create volume group if physical volumes are available
+      command: "vgcreate {{ vg_name }} {{ candidate_disks | join(' ') }}"
+      register: vg_create
+      when: 
+        - lvm2_install is success
+        - candidate_disks is defined and candidate_disks | length > 0
+        - vg_exists.rc != 0  # Volume group doesn't exist yet
+        - pv_create is defined and pv_create.changed
+
+    - name: Display volume group creation results
+      debug:
+        var: vg_create
+      when: vg_create is defined and vg_create.changed
+
+    - name: Get final volume group information
+      command: vgs
+      register: vgs_output
+      changed_when: false
+      when: lvm2_install is success
+
+    - name: Display volume groups
+      debug:
+        var: vgs_output.stdout_lines
+      when: vgs_output is defined
+
+    - name: Summary
+      debug:
+        msg: >
+          {% if lvm2_install is not success %}
+          LVM package could not be installed. Please install LVM2 manually and retry.
+          {% elif candidate_disks is defined and candidate_disks | length > 0 %}
+          Analysis complete. {{ vg_create is defined and vg_create.changed | ternary('Successfully created', 'Could not create') }} volume group {{ vg_name }} with {{ candidate_disks | length }} disk(s).
+          {% else %}
+          Analysis complete. No eligible disks found for creating a new volume group.
+          {% endif %}
