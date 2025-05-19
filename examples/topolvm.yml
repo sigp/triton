@@ -254,11 +254,7 @@
         microk8s kubectl apply -f https://github.com/cert-manager/cert-manager/releases/download/${CERT_MANAGER_VERSION}/cert-manager.crds.yaml
       changed_when: true
 
-    - name: Apply TopoLVM CRDs
-      delegate_to: k8s_api
-      command: >
-        microk8s helm3 upgrade --install --namespace=topolvm-system topolvm topolvm/topolvm --set cert-manager.enabled=true
-      # changed_when: true
+
 
     # Create values.yaml for Helm
     - name: Create values.yaml for TopoLVM helm chart
@@ -266,36 +262,26 @@
         dest: /tmp/topolvm-setup/values.yaml
         content: |
           node:
-            lvmd:
-              deviceClasses:
-                - name: ssd
-                  volume-group: {{ topolvm_vg_name }}
-                  default: true
-                  spare-gb: 10
-              extraVolumes:
-                - name: lvmd-config
-                  configMap:
-                    name: lvmd-config
-              extraVolumeMounts:
-                - name: lvmd-config
-                  mountPath: /etc/topolvm/lvmd.yaml
-                  subPath: lvmd.yaml
-          scheduler:
-            enable: true
-          lvmd:
-            managed: true
+            # node.lvmdEmbedded -- Specify whether to embed lvmd in the node container.
+            # Should not be used in conjunction with lvmd.managed otherwise lvmd will be started twice.
+            lvmdEmbedded: true
+            # node.lvmdSocket -- Specify the socket to be used for communication with lvmd.
+            lvmdSocket: /run/topolvm/lvmd.sock
+            # node.kubeletWorkDirectory -- Specify the work directory of Kubelet on the host.
+            # For example, on microk8s it needs to be set to `/var/snap/microk8s/common/var/lib/kubelet`
+            kubeletWorkDirectory: /var/snap/microk8s/common/var/lib/kubelet
 
     # Create ConfigMap with lvmd configuration
-    - name: Create lvmd ConfigMap
-      delegate_to: k8s_api
-      command: >
-        microk8s kubectl create configmap -n topolvm-system lvmd-config --from-literal=lvmd.yaml='
-        deviceClasses:
-          - name: ssd
-            volume-group: {{ topolvm_vg_name }}
-            default: true
-            spare-gb: 10
-        '
+    # - name: Create lvmd ConfigMap
+    #   delegate_to: k8s_api
+    #   command: >
+    #     microk8s kubectl create configmap -n topolvm-system lvmd-config --from-literal=lvmd.yaml='
+    #     deviceClasses:
+    #       - name: ssd
+    #         volume-group: {{ topolvm_vg_name }}
+    #         default: true
+    #         spare-gb: 10
+    #     '
 
     # Install TopoLVM using Helm
     - name: Install TopoLVM with Helm
@@ -317,22 +303,7 @@
       delay: 20
       until: pod_wait.rc == 0
 
-    # Create StorageClass
-    - name: Create StorageClass for TopoLVM
-      k8s:
-        kubeconfig: "{{ kube_config }}"
-        state: present
-        definition:
-          apiVersion: storage.k8s.io/v1
-          kind: StorageClass
-          metadata:
-            name: topolvm-ssd
-          provisioner: topolvm.io
-          parameters:
-            "csi.storage.k8s.io/fstype": "xfs"
-            "topolvm.io/device-class": "ssd"
-          volumeBindingMode: WaitForFirstConsumer
-          allowVolumeExpansion: true
+
 
     # Test deployment (optional)
     - name: Create a test PVC
@@ -352,32 +323,3 @@
               requests:
                 storage: 1Gi
             storageClassName: topolvm-ssd
-
-    - name: Display test instructions
-      debug:
-        msg: |
-          TopoLVM has been installed on your microk8s cluster.
-          A test PVC has been created. You can verify with:
-          
-          microk8s kubectl get pvc topolvm-test-pvc
-          
-          To create a test pod using this PVC:
-          
-          microk8s kubectl create -f - <<EOF
-          apiVersion: v1
-          kind: Pod
-          metadata:
-            name: topolvm-test-pod
-          spec:
-            containers:
-            - name: test-container
-              image: busybox
-              command: ["sh", "-c", "while true; do echo Success; sleep 10; done"]
-              volumeMounts:
-              - mountPath: "/data"
-                name: test-volume
-            volumes:
-            - name: test-volume
-              persistentVolumeClaim:
-                claimName: topolvm-test-pvc
-          EOF
