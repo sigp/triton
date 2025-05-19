@@ -1,0 +1,13 @@
+---
+- name: Debug TopoLVM volume groups
+  hosts: all
+  become: true
+
+  tasks:
+    - name: Get volume group information
+      command: vgs
+      register: vgs_output
+
+    - name: Display volume groups
+      debug:
+        var: vgs_output.stdout_lines
