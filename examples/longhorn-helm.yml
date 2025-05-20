@@ -1,0 +1,53 @@
+---
+- name: Install Longhorn using Helm
+  hosts: k8s_master
+  gather_facts: false
+  become: true
+  vars:
+    longhorn_namespace: "longhorn-system"
+    longhorn_version: "1.8.1"
+    longhorn_helm_repo: "https://charts.longhorn.io"
+    longhorn_helm_release: "longhorn"
+
+  tasks:
+    - name: Check if Helm is installed
+      command: microk8s helm version
+      register: helm_check
+      ignore_errors: true
+      changed_when: false
+
+    - name: Fail if Helm is not installed
+      fail:
+        msg: "Helm must be installed to deploy Longhorn"
+      when: helm_check.rc != 0
+
+    - name: Add Longhorn Helm repository
+      command: "microk8s helm repo add longhorn {{ longhorn_helm_repo }}"
+      register: repo_add
+      changed_when: "'already exists' not in repo_add.stderr"
+
+    - name: Update Helm repositories
+      command: microk8s helm repo update
+      changed_when: "'Successfully got an update' in repo_update.stdout"
+      register: repo_update
+
+    - name: Install Longhorn
+      command: >
+        microk8s helm upgrade --install {{ longhorn_helm_release }} longhorn/longhorn
+        --namespace {{ longhorn_namespace }}
+        --create-namespace
+        --version {{ longhorn_version }}
+      register: helm_install
+      changed_when: "'STATUS: deployed' in helm_install.stdout"
+
+    - name: Verify Longhorn pods are running
+      command: "microk8s kubectl -n {{ longhorn_namespace }} get pods"
+      register: pod_check
+      until: "'Running' in pod_check.stdout"
+      retries: 10
+      delay: 30
+      changed_when: false
+
+    - name: Display Longhorn status
+      debug:
+        msg: "Longhorn installed successfully in namespace {{ longhorn_namespace }}"
