@@ -176,13 +176,15 @@
         path: /tmp/topolvm-setup
         state: directory
         mode: '0755'
-        
+
     - name: Upload topo-debug.sh script
       copy:
         src: "{{ playbook_dir }}/../examples/topo-debug.sh"
         dest: /usr/local/bin/topo-debug.sh
         mode: '0755'
         remote_src: false
+      tags:
+        - debug
 
 
 # Configure nodes - create volume group if needed
