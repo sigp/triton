@@ -96,7 +96,7 @@ main() {
     echo "================="
     
     # Check dependencies
-    check_command kubectl "version" "(?<=GitVersion:\"v)[^\"]+"
+    check_command kubectl "version --client" "(?:Client Version: v|GitVersion:\"v)([0-9.]+)"
     check_command jq "--version" "(?<=jq-)[\d.]+"
     
     check_kubernetes
