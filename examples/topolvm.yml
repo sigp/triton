@@ -187,6 +187,9 @@
   vars:
     topolvm_version: "v15.5.5"
     kube_config: "/var/snap/microk8s/current/credentials/client.config"
+   
+    values_yaml_path: "/tmp/topolvm-setup/values.yaml"
+    
   become: yes
   tasks:
     - name: Create physical volume on first available device
@@ -235,8 +238,9 @@
 
     - name: Ensure required namespaces exist and label them for TopoLVM webhook
       delegate_to: k8s_api
+      become: true
       kubernetes.core.k8s:
-        state: present
+        state: present # absent
         definition:
           apiVersion: v1
           kind: Namespace
@@ -259,12 +263,18 @@
     # Create values.yaml for Helm
     - name: Create values.yaml for TopoLVM helm chart
       copy:
-        dest: /tmp/topolvm-setup/values.yaml
+        dest: "{{ values_yaml_path }}"
         content: |
+          # cert-manager.enabled: false 
+          cert-manager:
+            enabled: false  # Disable cert-manager if not needed
+
           node:
             # node.lvmdEmbedded -- Specify whether to embed lvmd in the node container.
             # Should not be used in conjunction with lvmd.managed otherwise lvmd will be started twice.
             lvmdEmbedded: true
+            # lvmd:
+              # managed: false
             # node.lvmdSocket -- Specify the socket to be used for communication with lvmd.
             lvmdSocket: /run/topolvm/lvmd.sock
             # node.kubeletWorkDirectory -- Specify the work directory of Kubelet on the host.
@@ -287,10 +297,10 @@
     - name: Install TopoLVM with Helm
       delegate_to: k8s_api
       command: >
-        microk8s helm3 upgrade --install  topolvm topolvm/topolvm 
+        microk8s helm3 install  topolvm topolvm/topolvm 
         --namespace topolvm-system 
         --version {{ topolvm_version }}
-        --values /tmp/topolvm-setup/values.yaml
+        --values {{ values_yaml_path }}
       changed_when: true
 
     # Wait for TopoLVM to be ready

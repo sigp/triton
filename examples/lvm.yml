@@ -1,4 +1,3 @@
----
 - name: Analyze server and create LVM volume group if possible
   hosts: all
   become: true
@@ -6,6 +5,7 @@
     vg_name: "new_vg"
     pv_devices: []  # Will be populated during execution
     min_disk_size_gb: 5  # Minimum disk size in GB to consider for LVM
+    create_when_vg_exists: false  # Set to true to create new VG even when others exist
 
   tasks:
     - name: Check if LVM2 is installed
@@ -26,16 +26,32 @@
         available_disks: "{{ lsblk_output.stdout_lines | select('match', '^\/dev\/.*disk.*$') | list }}"
       when: lvm2_install is success
 
-    - name: Display available disks
-      debug:
-        var: available_disks
+    - name: Get existing volume group information
+      command: vgs
+      register: vgs_output
+      changed_when: false
       when: lvm2_install is success
+
+    - name: Check if any volume groups exist
+      set_fact:
+        has_existing_vgs: "{{ vgs_output.stdout_lines | length > 1 }}"
+      when: lvm2_install is success and vgs_output is defined
+
+    - name: Display if existing volume groups were found
+      debug:
+        msg: "Existing volume groups detected: {{ has_existing_vgs | default(false) }}"
+      when: lvm2_install is success and has_existing_vgs is defined
 
     - name: Check if any disk is already part of a PV
       command: pvs --noheadings -o pv_name
       register: existing_pvs
       changed_when: false
       when: lvm2_install is success
+
+    - name: Display existing physical volumes
+      debug:
+        var: existing_pvs.stdout_lines
+      when: lvm2_install is success and existing_pvs is defined
 
     - name: Find unpartitioned disks not already in use
       set_fact:
@@ -81,7 +97,7 @@
       when: 
         - lvm2_install is success
         - candidate_disks is defined and candidate_disks | length > 0
-        - vg_exists.rc != 0  # Volume group doesn't exist yet
+        - (vg_exists.rc != 0 or create_when_vg_exists)  # Create only if VG doesn't exist or flag is set to true
 
     - name: Display physical volume creation results
       debug:
@@ -94,7 +110,7 @@
       when: 
         - lvm2_install is success
         - candidate_disks is defined and candidate_disks | length > 0
-        - vg_exists.rc != 0  # Volume group doesn't exist yet
+        - (vg_exists.rc != 0 or create_when_vg_exists)  # Create only if VG doesn't exist or flag is set to true
         - pv_create is defined and pv_create.changed
 
     - name: Display volume group creation results
@@ -118,8 +134,10 @@
         msg: >
           {% if lvm2_install is not success %}
           LVM package could not be installed. Please install LVM2 manually and retry.
+          {% elif has_existing_vgs | default(false) and not create_when_vg_exists %}
+          Analysis complete. Existing volume groups found and create_when_vg_exists=false, so no new volume group was created.
           {% elif candidate_disks is defined and candidate_disks | length > 0 %}
           Analysis complete. {{ vg_create is defined and vg_create.changed | ternary('Successfully created', 'Could not create') }} volume group {{ vg_name }} with {{ candidate_disks | length }} disk(s).
           {% else %}
-          Analysis complete. No eligible disks found for creating a new volume group.
+          Analysis complete. No eligible disks found for creating a new volume group. (Existing PVs: {{ existing_pvs.stdout_lines | length }})
           {% endif %}
