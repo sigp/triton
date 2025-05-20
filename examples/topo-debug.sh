@@ -43,10 +43,12 @@ check_kubernetes() {
     echo -e "\n=== Checking Kubernetes ==="
     local kube_version=$(kubectl version --client -o json | jq -r '.clientVersion.gitVersion' | sed 's/^v//')
     
+    echo -e "Detected version: ${YELLOW}$kube_version${NC}"
+    echo -e "Required minimum: ${YELLOW}$MIN_KUBERNETES_VERSION${NC}"
     if version_compare "$kube_version" "$MIN_KUBERNETES_VERSION"; then
-        echo -e "${GREEN}[OK]${NC} Kubernetes version $kube_version meets minimum requirement ($MIN_KUBERNETES_VERSION)"
+        echo -e "${GREEN}[OK]${NC} Kubernetes version meets minimum requirement"
     else
-        echo -e "${RED}[ERROR]${NC} Kubernetes version $kube_version is below minimum requirement ($MIN_KUBERNETES_VERSION)"
+        echo -e "${RED}[ERROR]${NC} Kubernetes version is below minimum requirement"
     fi
 }
 
@@ -59,10 +61,12 @@ check_lvm() {
         return
     fi
     
+    echo -e "Detected version: ${YELLOW}$lvm_version${NC}"
+    echo -e "Required minimum: ${YELLOW}$MIN_LVM_VERSION${NC}"
     if version_compare "$lvm_version" "$MIN_LVM_VERSION"; then
-        echo -e "${GREEN}[OK]${NC} LVM version $lvm_version meets minimum requirement ($MIN_LVM_VERSION)"
+        echo -e "${GREEN}[OK]${NC} LVM version meets minimum requirement"
     else
-        echo -e "${RED}[ERROR]${NC} LVM version $lvm_version is below minimum requirement ($MIN_LVM_VERSION)"
+        echo -e "${RED}[ERROR]${NC} LVM version is below minimum requirement"
     fi
     
     # Check for JSON support
