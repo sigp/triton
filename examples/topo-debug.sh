@@ -104,9 +104,9 @@ main() {
     check_kernel
     
     echo -e "\n=== System Checks ==="
-    check_command lvs "--version" "(?<=LVM version: )[\d.]+"
-    check_command vgs "--version" "(?<=LVM version: )[\d.]+"
-    check_command pvs "--version" "(?<=LVM version: )[\d.]+"
+    check_command "sudo lvs" "--version" "(LVM version: )?([\d.]+)"
+    check_command "sudo vgs" "--version" "(LVM version: )?([\d.]+)"
+    check_command "sudo pvs" "--version" "(LVM version: )?([\d.]+)"
     
     echo -e "\nNote: Future versions will include container log collection"
 }
