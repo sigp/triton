@@ -198,7 +198,7 @@
   environment:
     K8S_AUTH_KUBECONFIG: /var/snap/microk8s/current/credentials/client.config
     KUBECONFIG: /var/snap/microk8s/current/credentials/kubelet.config
-    CERT_MANAGER_VERSION: "v1.17.1"
+    CERT_MANAGER_VERSION: "v1.17.2"
   vars:
     topolvm_version: "v15.5.5"
     kube_config: "/var/snap/microk8s/current/credentials/client.config"
@@ -272,7 +272,7 @@
     - name: Ensure cert-manager CRDs are managed appropriately
       delegate_to: k8s_api
       command: >
-        microk8s kubectl apply -f https://github.com/cert-manager/cert-manager/releases/download/${CERT_MANAGER_VERSION}/cert-manager.crds.yaml
+        microk8s kubectl apply -f https://github.com/cert-manager/cert-manager/releases/download/${CERT_MANAGER_VERSION}/cert-manager.crds.yaml -n cert-manager
       changed_when: true
 
 
@@ -323,7 +323,7 @@
       register: pod_wait
       changed_when: false
       retries: 2
-      delay: 20
+      delay: 10
       until: pod_wait.rc == 0
 
 
