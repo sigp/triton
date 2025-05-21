@@ -137,6 +137,8 @@
         ansible_ssh_port: "{{hostvars[groups['k8s_master'][0]].ansible_port}}"
         ansible_user: "{{hostvars[groups['k8s_master'][0]].ansible_user}}"
 
+
+
 - name: Install and configure TopoLVM on the cluster
   hosts: k8s_master[0]
   become: yes
@@ -179,10 +181,13 @@
 
     - name: Upload topo-debug.sh script
       copy:
-        src: "{{ playbook_dir }}/../examples/topo-debug.sh"
-        dest: /usr/local/bin/topo-debug.sh
+        src: "{{ playbook_dir }}/../examples/{{ item }}"
+        dest: "/usr/local/bin/{{ item }}"
         mode: '0755'
         remote_src: false
+      loop:
+        - topolvm-k8s-debug.sh
+        - topo-debug.sh
       tags:
         - debug
 
@@ -197,7 +202,9 @@
   vars:
     topolvm_version: "v15.5.5"
     kube_config: "/var/snap/microk8s/current/credentials/client.config"
-   
+    enable_cert_manager: true
+    lvmdEmbedded: false
+  
     values_yaml_path: "/tmp/topolvm-setup/values.yaml"
     
   become: yes
@@ -262,7 +269,7 @@
         - topolvm-system
         - kube-system
 
-    - name: Ensure cert-manager is installed
+    - name: Ensure cert-manager CRDs are managed appropriately
       delegate_to: k8s_api
       command: >
         microk8s kubectl apply -f https://github.com/cert-manager/cert-manager/releases/download/${CERT_MANAGER_VERSION}/cert-manager.crds.yaml
@@ -275,14 +282,10 @@
       copy:
         dest: "{{ values_yaml_path }}"
         content: |
-          # cert-manager.enabled: false 
-          cert-manager:
-            enabled: false  # Disable cert-manager if not needed
-
           node:
             # node.lvmdEmbedded -- Specify whether to embed lvmd in the node container.
             # Should not be used in conjunction with lvmd.managed otherwise lvmd will be started twice.
-            lvmdEmbedded: true
+            lvmdEmbedded: {{ lvmdEmbedded }}
             # lvmd:
               # managed: false
             # node.lvmdSocket -- Specify the socket to be used for communication with lvmd.
@@ -307,7 +310,7 @@
     - name: Install TopoLVM with Helm
       delegate_to: k8s_api
       command: >
-        microk8s helm3 install  topolvm topolvm/topolvm 
+        microk8s helm3 upgrade --install  topolvm topolvm/topolvm 
         --namespace topolvm-system 
         --version {{ topolvm_version }}
         --values {{ values_yaml_path }}
@@ -319,7 +322,7 @@
         microk8s kubectl wait --for=condition=Ready pods -l app.kubernetes.io/name=topolvm -n topolvm-system --timeout=300s
       register: pod_wait
       changed_when: false
-      retries: 5
+      retries: 2
       delay: 20
       until: pod_wait.rc == 0
 
