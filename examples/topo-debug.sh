@@ -70,7 +70,7 @@ check_lvm() {
     fi
     
     # Check for JSON support
-    if lvm -j &> /dev/null; then
+    if sudo lvm lvs --reportformat=json &> /dev/null; then
         echo -e "${GREEN}[OK]${NC} LVM has JSON output support"
     else
         echo -e "${RED}[ERROR]${NC} LVM does not support JSON output (required)"
@@ -108,7 +108,10 @@ main() {
     check_command "sudo vgs" "--version" "(LVM version: )?([\d.]+)"
     check_command "sudo pvs" "--version" "(LVM version: )?([\d.]+)"
     
-    echo -e "\nNote: Future versions will include container log collection"
+    echo -e "\nNote: For Kubernetes debugging, use the topolvm-k8s-debug.sh script"
+    check_k8s_pods
+    
+    echo -e "\nNote: For detailed debugging, use 'kubectl describe pod <name> -n topolvm-system'"
 }
 
 main "$@"
