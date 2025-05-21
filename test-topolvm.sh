@@ -19,6 +19,10 @@ declare -a gist_urls
 
 # Loop through lvmdEmbedded settings
 for lvmd_setting in "true" "false"; do
+    echo "Cleaning up previous TopoLVM installation..."
+
+    ssh ubuntu@51.222.44.144 -p 22 "kubectl delete ns topolvm-system"
+
     echo "Testing with lvmdEmbedded=$lvmd_setting"
     
     # Run ansible-playbook with the current setting
