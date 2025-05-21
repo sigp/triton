@@ -31,7 +31,7 @@ for lvmd_setting in "true" "false"; do
         continue
     fi
 
-    ssh ssh ubuntu@$master_node -p $master_port "kubectl delete ns topolvm-system"
+    ssh ubuntu@$master_node -p $master_port "microk8s kubectl delete ns topolvm-system"
 
     echo "Testing with lvmdEmbedded=$lvmd_setting"
     
