@@ -8,7 +8,7 @@ NC='\033[0m' # No Color
 
 # Check if kubectl is available
 check_kubectl() {
-    if ! command -v kubectl &> /dev/null; then
+    if ! command -v microk8s kubectl &> /dev/null; then
         echo -e "${RED}[ERROR]${NC} kubectl not found in PATH"
         exit 1
     fi
@@ -24,12 +24,12 @@ check_k8s_pods() {
     # Check if jq is available
     if ! command -v jq &> /dev/null; then
         echo -e "${YELLOW}[WARN]${NC} jq not found - using basic pod status checks"
-        kubectl get pods -n $namespace
+        microk8s kubectl get pods -n $namespace
         return
     fi
 
     # Get all pods in namespace with robust JSON handling
-    local pod_json=$(kubectl get pods -n $namespace -o json 2>/dev/null)
+    local pod_json=$(microk8s kubectl get pods -n $namespace -o json 2>/dev/null)
     if [ -z "$pod_json" ]; then
         echo -e "${RED}[ERROR]${NC} Failed to get pod data from Kubernetes"
         return
@@ -55,7 +55,7 @@ check_k8s_pods() {
         # Check for ContainerCreating
         if [[ "$status" == "Pending" ]]; then
             echo -e "${YELLOW}[WARN]${NC} Pod is in Pending state"
-            local events=$(kubectl get events -n $namespace --field-selector involvedObject.name=$name --sort-by=.metadata.creationTimestamp 2>/dev/null)
+            local events=$(microk8s kubectl get events -n $namespace --field-selector involvedObject.name=$name --sort-by=.metadata.creationTimestamp 2>/dev/null)
             if [ -n "$events" ]; then
                 echo -e "Recent events:\n$events"
             fi
@@ -67,8 +67,8 @@ check_k8s_pods() {
             local problem_containers=$(echo "$pod" | jq -r '.status.containerStatuses[] | select(.state.waiting.reason == "CrashLoopBackOff") | .name')
             for container in $problem_containers; do
                 echo -e "Checking logs for container: $container"
-                kubectl logs -n $namespace $name -c $container --previous 2>/dev/null || \
-                kubectl logs -n $namespace $name -c $container 2>/dev/null
+                microk8s kubectl logs -n $namespace $name -c $container --previous 2>/dev/null || \
+                microk8s kubectl logs -n $namespace $name -c $container 2>/dev/null
             done
         fi
     done
