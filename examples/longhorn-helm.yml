@@ -48,6 +48,15 @@
       delay: 30
       changed_when: false
 
+    - name: Copy troubleshooting script to master node
+      copy:
+        src: "{{ playbook_dir }}/longhorn-debug.sh"
+        dest: /usr/local/bin/longhorn-debug.sh
+        mode: '0755'
+        remote_src: false
+
     - name: Display Longhorn status
       debug:
-        msg: "Longhorn installed successfully in namespace {{ longhorn_namespace }}"
+        msg: |
+          "Longhorn installed successfully in namespace {{ longhorn_namespace }}
+          Troubleshooting script available at /usr/local/bin/longhorn-debug.sh"
