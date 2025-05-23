@@ -146,9 +146,23 @@ do_check_components() {
   
   # 1. Verify Longhorn manager pods with detailed status
   out "\n${col_ylw}=== Core Components ===${col_reset}"
+  # Get detailed pod info first
+  out "\n${col_ylw}Manager Pod Details:${col_reset}"
+  kubectl get pods -n "$namespace" -l app=longhorn-manager -o wide -o json | jq -r '.items[] | "\(.metadata.name) \(.status.phase) \(.status.podIP // "none") \(.status.conditions[] | select(.type=="Ready").status)"'
+  
+  # Check each pod's status and connectivity
   kubectl get pods -n "$namespace" -l app=longhorn-manager --field-selector=status.phase=Running -o json | jq -r '.items[].metadata.name' | while read -r pod; do
     if [[ $(kubectl get pod "$pod" -n "$namespace" -o json | jq '.status.conditions[] | select(.type == "Ready").status') == "True" ]]; then
       out "${col_grn}✓${col_reset} Manager Pod: $pod"
+      
+      # Check DNS connectivity even for ready pods with timeout
+      out "\n${col_ylw}DNS Check for $pod:${col_reset}"
+      if kubectl exec -n "$namespace" "$pod" -- timeout 5 nslookup longhorn-backend >/dev/null 2>&1; then
+        out "${col_grn}✓${col_reset} DNS resolution successful"
+      else
+        out "${col_red}✗${col_reset} DNS resolution failed"
+        exit_code=1
+      fi
     else
       out "${col_red}✗${col_reset} Manager Pod: $pod (not ready)"
       
@@ -161,6 +175,15 @@ do_check_components() {
       if [[ "$pod_status" == "Running" ]]; then
         out "\n${col_ylw}Pod Logs (last 10 lines):${col_reset}"
         kubectl logs "$pod" -n "$namespace" --tail=10 || true
+        
+        # Check DNS connectivity for running but not ready pods with timeout
+        out "\n${col_ylw}DNS Check for $pod:${col_reset}"
+        if kubectl exec -n "$namespace" "$pod" -- timeout 5 nslookup longhorn-backend >/dev/null 2>&1; then
+          out "${col_grn}✓${col_reset} DNS resolution successful"
+        else
+          out "${col_red}✗${col_reset} DNS resolution failed"
+          exit_code=1
+        fi
       fi
       
       exit_code=1
