@@ -144,27 +144,71 @@ do_check_components() {
   log_to_file "Checking Longhorn components"
   local exit_code=0
   
-  # 1. Verify Longhorn manager pods
+  # 1. Verify Longhorn manager pods with detailed status
   out "\n${col_ylw}=== Core Components ===${col_reset}"
   kubectl get pods -n "$namespace" -l app=longhorn-manager --field-selector=status.phase=Running -o json | jq -r '.items[].metadata.name' | while read -r pod; do
     if [[ $(kubectl get pod "$pod" -n "$namespace" -o json | jq '.status.conditions[] | select(.type == "Ready").status') == "True" ]]; then
       out "${col_grn}✓${col_reset} Manager Pod: $pod"
     else
       out "${col_red}✗${col_reset} Manager Pod: $pod (not ready)"
+      
+      # Show pod events for troubleshooting
+      out "\n${col_ylw}Pod Events:${col_reset}"
+      kubectl get events -n "$namespace" --field-selector involvedObject.name="$pod" --sort-by='.lastTimestamp'
+      
+      # Show last 10 lines of logs if pod is running but not ready
+      pod_status=$(kubectl get pod "$pod" -n "$namespace" -o json | jq -r '.status.phase')
+      if [[ "$pod_status" == "Running" ]]; then
+        out "\n${col_ylw}Pod Logs (last 10 lines):${col_reset}"
+        kubectl logs "$pod" -n "$namespace" --tail=10 || true
+      fi
+      
       exit_code=1
     fi
   done
 
-  # 2. Check CSI driver health
+  # 2. Check CSI driver health with detailed status
   out "\n${col_ylw}=== CSI Driver ===${col_reset}"
   kubectl get pods -n "$namespace" -l app=longhorn-csi-plugin --field-selector=status.phase=Running -o json | jq -r '.items[].metadata.name' | while read -r pod; do
     if [[ $(kubectl get pod "$pod" -n "$namespace" -o json | jq '.status.conditions[] | select(.type == "Ready").status') == "True" ]]; then
       out "${col_grn}✓${col_reset} CSI Pod: $pod"
     else
       out "${col_red}✗${col_reset} CSI Pod: $pod (not ready)"
+      
+      # Show pod events for troubleshooting
+      out "\n${col_ylw}Pod Events:${col_reset}"
+      kubectl get events -n "$namespace" --field-selector involvedObject.name="$pod" --sort-by='.lastTimestamp'
+      
       exit_code=1
     fi
   done
+  
+  # 3. Check Longhorn CRDs
+  out "\n${col_ylw}=== Longhorn CRDs ===${col_reset}"
+  local crd_count=0
+  crd_count=$(kubectl get crd -o name | grep -c 'longhorn.io')
+  if [[ $crd_count -gt 0 ]]; then
+    out "${col_grn}✓${col_reset} Found $crd_count Longhorn CRDs"
+  else
+    out "${col_red}✗${col_reset} No Longhorn CRDs found"
+    exit_code=1
+  fi
+  
+  # 4. Check StorageClass
+  out "\n${col_ylw}=== Storage Classes ===${col_reset}"
+  local sc_count=0
+  sc_count=$(kubectl get sc -o name | grep -c 'longhorn')
+  if [[ $sc_count -gt 0 ]]; then
+    out "${col_grn}✓${col_reset} Found $sc_count Longhorn StorageClass(es)"
+    kubectl get sc -l storageclass.kubernetes.io/is-default-class
+  else
+    out "${col_red}✗${col_reset} No Longhorn StorageClass found"
+    exit_code=1
+  fi
+  
+  # 5. Check node taints that might affect scheduling
+  out "\n${col_ylw}=== Node Taints ===${col_reset}"
+  kubectl get nodes -o json | jq -r '.items[] | .metadata.name + ": " + (.spec.taints | if . then map(.key + "=" + .value + ":" + .effect) | join(",") else "none" end)'
 
   # 3. Verify UI deployment status
   out "\n${col_ylw}=== Web UI ===${col_reset}"
