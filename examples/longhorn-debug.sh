@@ -151,13 +151,32 @@ do_check_components() {
   kubectl get pods -n "$namespace" -l app=longhorn-manager -o wide -o json | jq -r '.items[] | "\(.metadata.name) \(.status.phase) \(.status.podIP // "none") \(.status.conditions[] | select(.type=="Ready").status)"'
   
   # Check each pod's status and connectivity
-  kubectl get pods -n "$namespace" -l app=longhorn-manager --field-selector=status.phase=Running -o json | jq -r '.items[].metadata.name' | while read -r pod; do
-    if [[ $(kubectl get pod "$pod" -n "$namespace" -o json | jq '.status.conditions[] | select(.type == "Ready").status') == "True" ]]; then
+  # Get all manager pods with timeout
+  pods=$(timeout 10 kubectl get pods -n "$namespace" -l app=longhorn-manager --field-selector=status.phase=Running -o json | jq -r '.items[].metadata.name' 2>/dev/null || echo "")
+  
+  if [[ -z "$pods" ]]; then
+    out "${col_red}✗${col_reset} Failed to get pod list or no pods found"
+    return 1
+  fi
+
+  echo "$pods" | while read -r pod; do
+    # Get pod status with timeout
+    pod_json=$(timeout 10 kubectl get pod "$pod" -n "$namespace" -o json 2>/dev/null)
+    if [[ -z "$pod_json" ]]; then
+      out "${col_red}✗${col_reset} Failed to get status for pod: $pod"
+      exit_code=1
+      continue
+    fi
+
+    ready_status=$(echo "$pod_json" | jq -r '.status.conditions[] | select(.type == "Ready").status')
+    pod_status=$(echo "$pod_json" | jq -r '.status.phase')
+
+    if [[ "$ready_status" == "True" ]]; then
       out "${col_grn}✓${col_reset} Manager Pod: $pod"
       
-      # Check DNS connectivity even for ready pods with timeout
+      # Check DNS with timeout
       out "\n${col_ylw}DNS Check for $pod:${col_reset}"
-      if kubectl exec -n "$namespace" "$pod" -- timeout 5 nslookup longhorn-backend >/dev/null 2>&1; then
+      if timeout 15 kubectl exec -n "$namespace" "$pod" -- timeout 5 nslookup longhorn-backend >/dev/null 2>&1; then
         out "${col_grn}✓${col_reset} DNS resolution successful"
       else
         out "${col_red}✗${col_reset} DNS resolution failed"
@@ -166,19 +185,16 @@ do_check_components() {
     else
       out "${col_red}✗${col_reset} Manager Pod: $pod (not ready)"
       
-      # Show pod events for troubleshooting
+      # Get events with timeout
       out "\n${col_ylw}Pod Events:${col_reset}"
-      kubectl get events -n "$namespace" --field-selector involvedObject.name="$pod" --sort-by='.lastTimestamp'
+      timeout 10 kubectl get events -n "$namespace" --field-selector involvedObject.name="$pod" --sort-by='.lastTimestamp' 2>/dev/null || true
       
-      # Show last 10 lines of logs if pod is running but not ready
-      pod_status=$(kubectl get pod "$pod" -n "$namespace" -o json | jq -r '.status.phase')
       if [[ "$pod_status" == "Running" ]]; then
         out "\n${col_ylw}Pod Logs (last 10 lines):${col_reset}"
-        kubectl logs "$pod" -n "$namespace" --tail=10 || true
+        timeout 15 kubectl logs "$pod" -n "$namespace" --tail=10 2>/dev/null || true
         
-        # Check DNS connectivity for running but not ready pods with timeout
         out "\n${col_ylw}DNS Check for $pod:${col_reset}"
-        if kubectl exec -n "$namespace" "$pod" -- timeout 5 nslookup longhorn-backend >/dev/null 2>&1; then
+        if timeout 15 kubectl exec -n "$namespace" "$pod" -- timeout 5 nslookup longhorn-backend >/dev/null 2>&1; then
           out "${col_grn}✓${col_reset} DNS resolution successful"
         else
           out "${col_red}✗${col_reset} DNS resolution failed"
