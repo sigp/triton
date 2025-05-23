@@ -72,3 +72,10 @@
         msg: |
           "Longhorn installed successfully in namespace {{ longhorn_namespace }}
           Troubleshooting script available at /usr/local/bin/longhorn-debug.sh"
+
+    - name: Uninstall Longhorn
+      command: microk8s helm uninstall {{ longhorn_helm_release }} -n {{ longhorn_namespace }}
+      ignore_errors: true
+      changed_when: false
+      tags:
+        - uninstall
