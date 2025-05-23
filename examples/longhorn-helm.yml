@@ -8,6 +8,7 @@
     longhorn_version: "1.8.1"
     longhorn_helm_repo: "https://charts.longhorn.io"
     longhorn_helm_release: "longhorn"
+    longhorn_values_path: "/usr/local/bin/longhorn-values.yml"
 
   tasks:
     - name: Check if Helm is installed
@@ -31,12 +32,21 @@
       changed_when: "'Successfully got an update' in repo_update.stdout"
       register: repo_update
 
+    - name: Create Longhorn values file
+      copy:
+        content: |
+          csi:
+            kubeletRootDir: /var/snap/microk8s/common/var/lib/kubelet
+        dest: "{{ longhorn_values_path }}"
+        mode: '0644'
+
     - name: Install Longhorn
       command: >
         microk8s helm upgrade --install {{ longhorn_helm_release }} longhorn/longhorn
         --namespace {{ longhorn_namespace }}
         --create-namespace
         --version {{ longhorn_version }}
+        --values "{{ longhorn_values_path }}"
       register: helm_install
       changed_when: "'STATUS: deployed' in helm_install.stdout"
 
