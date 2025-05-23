@@ -204,6 +204,7 @@
     kube_config: "/var/snap/microk8s/current/credentials/client.config"
     enable_cert_manager: true
     lvmdEmbedded: false
+    topo_namespace: "topolvm-system"
   
     values_yaml_path: "/tmp/topolvm-setup/values.yaml"
     
@@ -311,7 +312,7 @@
       delegate_to: k8s_api
       command: >
         microk8s helm3 upgrade --install  topolvm topolvm/topolvm 
-        --namespace topolvm-system 
+        --namespace {{ topo_namespace }}
         --version {{ topolvm_version }}
         --values {{ values_yaml_path }}
       changed_when: true
@@ -329,6 +330,13 @@
 
 
     # Test deployment (optional)
+    - name: Uninstall TopoLVM
+      command: microk8s helm3 uninstall topolvm -n {{ topo_namespace }}
+      ignore_errors: true
+      changed_when: false
+      tags:
+        - uninstall
+
     - name: Create a test PVC
       k8s:
         kubeconfig: "{{ kube_config }}"
