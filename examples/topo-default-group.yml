@@ -1,0 +1,206 @@
+---
+- name: Create myvg1 volume group for TopoLVM using loop device
+  hosts: all
+  become: true
+  vars:
+    vg_name: "myvg1"
+    loop_file_path: "/var/lib/topolvm-storage.img"
+    loop_file_size_gb: 50  # Size of the loop file in GB
+    force_recreate: false  # Set to true to recreate existing setup
+
+  tasks:
+    - name: Install LVM2 package
+      package:
+        name: lvm2
+        state: present
+
+    - name: Check if volume group already exists
+      command: vgs {{ vg_name }}
+      register: vg_exists
+      changed_when: false
+      failed_when: false
+
+    - name: Display existing VG status
+      debug:
+        msg: >-
+          {% if vg_exists.rc == 0 %}
+          Volume group {{ vg_name }} already exists
+          {% else %}
+          Volume group {{ vg_name }} does not exist - will create
+          {% endif %}
+
+    - name: Check available disk space on root filesystem
+      shell: df -BG / | awk 'NR==2 {print $4}' | sed 's/G//'
+      register: available_space_gb
+      changed_when: false
+
+    - name: Display available space
+      debug:
+        msg: "Available space on root filesystem: {{ available_space_gb.stdout }}GB, Requested: {{ loop_file_size_gb }}GB"
+
+    - name: Fail if insufficient space
+      fail:
+        msg: "Insufficient space: {{ available_space_gb.stdout }}GB available, need {{ loop_file_size_gb + 5 }}GB (including 5GB buffer)"
+      when: 
+        - vg_exists.rc != 0 or force_recreate
+        - available_space_gb.stdout | int < (loop_file_size_gb + 5)
+
+    - name: Clean up existing setup if force_recreate is enabled
+      block:
+        - name: Get loop device for existing file
+          shell: "losetup -j {{ loop_file_path }} | cut -d: -f1"
+          register: existing_loop_device
+          changed_when: false
+          failed_when: false
+
+        - name: Remove existing volume group
+          command: vgremove -f {{ vg_name }}
+          when: vg_exists.rc == 0
+          ignore_errors: yes
+
+        - name: Remove existing physical volume
+          command: pvremove {{ existing_loop_device.stdout }}
+          when: existing_loop_device.stdout != ""
+          ignore_errors: yes
+
+        - name: Detach existing loop device
+          command: losetup -d {{ existing_loop_device.stdout }}
+          when: existing_loop_device.stdout != ""
+          ignore_errors: yes
+
+        - name: Remove existing loop file
+          file:
+            path: "{{ loop_file_path }}"
+            state: absent
+      when: 
+        - force_recreate | bool
+        - vg_exists.rc == 0
+
+    - name: Create TopoLVM setup
+      block:
+        - name: Create directory for loop file
+          file:
+            path: "{{ loop_file_path | dirname }}"
+            state: directory
+            mode: '0755'
+
+        - name: Create sparse file for loop device
+          command: fallocate -l {{ loop_file_size_gb }}G {{ loop_file_path }}
+          args:
+            creates: "{{ loop_file_path }}"
+
+        - name: Set up loop device
+          command: losetup -f {{ loop_file_path }}
+          register: loop_setup
+          changed_when: true
+
+        - name: Get the loop device name
+          shell: "losetup -j {{ loop_file_path }} | cut -d: -f1"
+          register: loop_device
+          changed_when: false
+
+        - name: Display loop device
+          debug:
+            msg: "Using loop device: {{ loop_device.stdout }}"
+
+        - name: Create physical volume on loop device
+          command: pvcreate {{ loop_device.stdout }}
+          register: pv_create
+
+        - name: Create volume group
+          command: vgcreate {{ vg_name }} {{ loop_device.stdout }}
+          register: vg_create
+
+        - name: Make loop device persistent across reboots
+          lineinfile:
+            path: /etc/rc.local
+            create: yes
+            mode: '0755'
+            line: "losetup -f {{ loop_file_path }}"
+            insertbefore: "exit 0"
+
+        - name: Ensure rc.local is executable
+          file:
+            path: /etc/rc.local
+            mode: '0755'
+
+        - name: Create systemd service for loop device persistence
+          copy:
+            content: |
+              [Unit]
+              Description=Setup TopoLVM loop device
+              After=local-fs.target
+
+              [Service]
+              Type=oneshot
+              ExecStart=/bin/bash -c 'if ! losetup -j {{ loop_file_path }} | grep -q {{ loop_file_path }}; then losetup -f {{ loop_file_path }}; fi'
+              RemainAfterExit=yes
+
+              [Install]
+              WantedBy=multi-user.target
+            dest: /etc/systemd/system/topolvm-loop.service
+            mode: '0644'
+
+        - name: Enable and start the loop device service
+          systemd:
+            name: topolvm-loop
+            enabled: yes
+            state: started
+            daemon_reload: yes
+
+      when: vg_exists.rc != 0 or force_recreate
+
+    - name: Verify final setup
+      block:
+        - name: Check volume group status
+          command: vgs {{ vg_name }}
+          register: final_vg_status
+          changed_when: false
+
+        - name: Check volume group free space
+          shell: vgs --noheadings -o vg_free --units g {{ vg_name }}
+          register: vg_free_space
+          changed_when: false
+
+        - name: Display volume group information
+          debug:
+            var: final_vg_status.stdout_lines
+
+        - name: Display free space available for TopoLVM
+          debug:
+            msg: "Volume group {{ vg_name }} has {{ vg_free_space.stdout.strip() }} of free space for TopoLVM"
+
+        - name: Check loop device persistence
+          shell: losetup -j {{ loop_file_path }}
+          register: loop_check
+          changed_when: false
+
+        - name: Display loop device info
+          debug:
+            msg: "Loop device: {{ loop_check.stdout }}"
+
+    - name: Final summary
+      debug:
+        msg: >-
+          {% if vg_exists.rc == 0 and not force_recreate %}
+          Volume group {{ vg_name }} already existed. Setup verified successfully.
+          {% else %}
+          Successfully created {{ vg_name }} volume group using {{ loop_file_size_gb }}GB loop device.
+          Loop file: {{ loop_file_path }}
+          Available space: {{ vg_free_space.stdout.strip() if vg_free_space is defined else 'Unknown' }}
+          {% endif %}
+
+    - name: Post-installation notes
+      debug:
+        msg: |
+          TopoLVM setup complete! 
+          
+          Important notes:
+          1. Volume group '{{ vg_name }}' is now available for TopoLVM
+          2. Loop device is automatically configured to persist across reboots
+          3. Storage file location: {{ loop_file_path }}
+          4. You can now restart your TopoLVM pods: kubectl delete pods -n topolvm-system -l app.kubernetes.io/name=lvmd
+          
+          To check TopoLVM status after restart:
+          kubectl get pods -n topolvm-system
+          kubectl logs -n topolvm-system -l app.kubernetes.io/name=lvmd
