@@ -2,7 +2,7 @@
   hosts: all
   become: true
   vars:
-    vg_name: "new_vg"
+    vg_name: "myvg1"
     pv_devices: []  # Will be populated during execution
     min_disk_size_gb: 5  # Minimum disk size in GB to consider for LVM
     create_when_vg_exists: false  # Set to true to create new VG even when others exist

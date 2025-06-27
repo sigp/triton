@@ -10,6 +10,7 @@
   gather_facts: yes
   vars:
     topolvm_version: "v15.5.5"
+    topolvm_vg_name: "topolvm"
   tasks:
     - name: Ensure required packages are installed
       package:
@@ -125,7 +126,7 @@
         lvm_status: "{{ node_ready_for_topolvm | bool }}"
         topolvm_vg_exists: "{{ topolvm_vg_exists | default(false) | bool }}"
         available_devices: "{{ available_devices | list }}"
-        topolvm_vg_name: "{{ topolvm_vg_name | default('topolvm-vg') }}"
+        topolvm_vg_name: "{{ topolvm_vg_name | default('topolvm') }}"
         kube_config: "{{ kube_config | default('/var/snap/microk8s/current/credentials/client.config') }}"
         topolvm_version: "{{ topolvm_version  }}"
       when: node_ready_for_topolvm | bool
@@ -203,7 +204,7 @@
     topolvm_version: "v15.5.5"
     kube_config: "/var/snap/microk8s/current/credentials/client.config"
     enable_cert_manager: true
-    lvmdEmbedded: false
+    lvmdEmbedded: true
   
     values_yaml_path: "/tmp/topolvm-setup/values.yaml"
     
@@ -282,12 +283,31 @@
       copy:
         dest: "{{ values_yaml_path }}"
         content: |
+          lvmd:
+            # lvmd.managed -- If true, set up lvmd service with DaemonSet.
+            managed: true
+
+            # lvmd.socketName -- Specify socketName.
+            socketName: /run/topolvm/lvmd.sock
+
+            # lvmd.deviceClasses -- Specify the device-class settings.
+            deviceClasses:
+              - name: ssd
+                volume-group: {{ topolvm_vg_name }}
+                default: true
+                spare-gb: 10
           node:
             # node.lvmdEmbedded -- Specify whether to embed lvmd in the node container.
             # Should not be used in conjunction with lvmd.managed otherwise lvmd will be started twice.
             lvmdEmbedded: {{ lvmdEmbedded }}
-            # lvmd:
-              # managed: false
+            
+            lvmd:
+              managed: false
+              deviceClasses:
+              - name: ssd
+                volume-group: {{ topolvm_vg_name }}
+                default: true
+                spare-gb: 10
             # node.lvmdSocket -- Specify the socket to be used for communication with lvmd.
             lvmdSocket: /run/topolvm/lvmd.sock
             # node.kubeletWorkDirectory -- Specify the work directory of Kubelet on the host.
@@ -328,21 +348,21 @@
 
 
 
-    # Test deployment (optional)
-    - name: Create a test PVC
-      k8s:
-        kubeconfig: "{{ kube_config }}"
-        state: present
-        definition:
-          apiVersion: v1
-          kind: PersistentVolumeClaim
-          metadata:
-            name: topolvm-test-pvc
-            namespace: default
-          spec:
-            accessModes:
-              - ReadWriteOnce
-            resources:
-              requests:
-                storage: 1Gi
-            storageClassName: topolvm-ssd
+    # # Test deployment (optional)
+    # - name: Create a test PVC
+    #   k8s:
+    #     kubeconfig: "{{ kube_config }}"
+    #     state: present
+    #     definition:
+    #       apiVersion: v1
+    #       kind: PersistentVolumeClaim
+    #       metadata:
+    #         name: topolvm-test-pvc
+    #         namespace: default
+    #       spec:
+    #         accessModes:
+    #           - ReadWriteOnce
+    #         resources:
+    #           requests:
+    #             storage: 1Gi
+    #         storageClassName: topolvm-ssd
