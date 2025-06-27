@@ -1,0 +1,43 @@
+---
+# Tasks for Helm chart installation
+- name: Add TopoLVM Helm repository
+  ansible.builtin.command: helm repo add topolvm https://topolvm.github.io/topolvm
+  changed_when: false
+
+- name: Update Helm repositories
+  ansible.builtin.command: helm repo update
+  changed_when: false
+
+- name: Create directory for values.yaml
+  ansible.builtin.file:
+    path: "{{ values_path | dirname }}"
+    state: directory
+    mode: '0755'
+  changed_when: false
+
+- name: Ensure values.yaml is writable
+  ansible.builtin.file:
+    path: "{{ values_path }}"
+    state: touch
+    mode: '0644'
+
+- name: Create values.yaml for TopoLVM
+  ansible.builtin.copy:
+    dest: "{{ values_path }}"
+    content: |
+      useLegacy: false
+      scheduler:
+        enable: true
+      node:
+        kubeletWorkDirectory: "{{ kubelet_work_directory }}"
+      lvmd:
+        managed: true
+        deviceClasses: {{ device_classes | to_nice_yaml | indent(6) }}
+
+- name: Install TopoLVM with Helm
+  ansible.builtin.command: >
+    helm install topolvm topolvm/topolvm \
+    --namespace topolvm-system \
+    --version {{ topolvm_version }} \
+    --values {{ values_path }}
+  changed_when: true

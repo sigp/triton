@@ -1,0 +1,24 @@
+---
+# Verification tasks for TopoLVM installation
+- name: Ensure required namespaces exist
+  kubernetes.core.k8s:
+    state: present
+    definition:
+      apiVersion: v1
+      kind: Namespace
+      metadata:
+        name: "{{ item }}"
+        labels:
+          topolvm.io/webhook: "ignore"
+  loop:
+    - topolvm-system
+    - kube-system
+
+- name: Wait for TopoLVM pods to be ready
+  ansible.builtin.command: >
+    kubectl wait --for=condition=Ready pods -l app.kubernetes.io/name=topolvm -n topolvm-system --timeout=300s
+  register: pod_wait
+  changed_when: false
+  retries: 5
+  delay: 20
+  until: pod_wait.rc == 0

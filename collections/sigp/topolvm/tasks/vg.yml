@@ -1,0 +1,21 @@
+---
+# Tasks for creating TopoLVM volume group
+- name: Check if volume group exists
+  ansible.builtin.command: vgdisplay {{ topolvm_vg_name }}
+  register: vg_exists
+  ignore_errors: true
+  changed_when: false
+
+- name: Create physical volume if needed
+  ansible.builtin.command: pvcreate /dev/{{ available_devices[0] }}
+  when: 
+    - not vg_exists.rc == 0
+    - available_devices | length > 0
+    - topolvm_create_vg | default(true)
+
+- name: Create volume group if needed
+  ansible.builtin.command: vgcreate {{ topolvm_vg_name }} /dev/{{ available_devices[0] }}
+  when: 
+    - not vg_exists.rc == 0
+    - available_devices | length > 0
+    - topolvm_create_vg | default(true)

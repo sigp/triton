@@ -1,0 +1,23 @@
+---
+# TopoLVM version to install
+topolvm_version: "v15.5.5"
+
+# Cert Manager version (optional)
+cert_manager_version: "v1.17.1"
+
+# Volume group name for TopoLVM
+topolvm_vg_name: "topolvm"
+
+# Path for values.yaml
+values_path: "/tmp/topolvm-setup/values.yaml"
+
+# MicroK8s specific settings
+kubelet_work_directory: "/var/snap/microk8s/common/var/lib/kubelet"
+
+# Device class configuration
+install_certmanager: false
+device_classes:
+  - name: "ssd"
+    volume_group: "{{ topolvm_vg_name }}"
+    default: true
+    spare_gb: 10

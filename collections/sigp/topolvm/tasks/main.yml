@@ -1,0 +1,15 @@
+---
+# Main tasks file for TopoLVM role
+- name: Include volume group tasks
+  ansible.builtin.include_tasks: vg.yml
+  when: topolvm_create_vg | default(true)
+
+- name: Include cert-manager installation tasks
+  ansible.builtin.include_tasks: certmanager.yml
+  when: install_certmanager
+
+- name: Include Helm setup tasks
+  ansible.builtin.include_tasks: helm.yml
+
+- name: Include verification tasks
+  ansible.builtin.include_tasks: verify.yml

@@ -1,0 +1,20 @@
+- name: Install cert-manager CRDs
+  ansible.builtin.command: >
+    kubectl apply -f https://github.com/cert-manager/cert-manager/releases/download/{{ cert_manager_version }}/cert-manager.crds.yaml
+  register: crd_result
+  changed_when: crd_result.rc == 0
+
+- name: Add jetstack helm repo
+  ansible.builtin.command: helm repo add jetstack https://charts.jetstack.io
+  register: repo_result
+  changed_when: repo_result.rc == 0
+  when: not repo_result.changed
+
+- name: Install cert-manager with Helm
+  ansible.builtin.command: >
+    helm install cert-manager jetstack/cert-manager \
+    --namespace cert-manager \
+    --create-namespace \
+    --version {{ cert_manager_version }}
+  register: helm_result
+  changed_when: helm_result.rc == 0
